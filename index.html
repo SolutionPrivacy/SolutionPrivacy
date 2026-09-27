@@ -1220,8 +1220,8 @@
 
   var scene = new THREE.Scene();
   var camera = new THREE.PerspectiveCamera(42, 1.2, 0.1, 100);
-  camera.position.set(0, 0.35, 5.4);
-  camera.lookAt(0, -0.1, 0);
+  camera.position.set(0, 0.05, 5.2);
+  camera.lookAt(0, 0, 0);
 
   // prawdziwe oświetlenie — dzięki temu bryła kłódki ma realne cieniowanie
   // (bez tego płaskie kolory nie czytają się jako 3D, nawet przy obrocie)
@@ -1233,31 +1233,42 @@
   rimLight.position.set(-3, -1, -2);
   scene.add(rimLight);
 
-  // ---- pomieszczenie: podłoga + ściana z czerwonej neonowej siatki ----
-  // (prawdziwa geometria 3D pod kątem, nie płaska tekstura na wprost
-  // kamery — dzięki temu widać głębię, a nie "coś jakby od tyłu")
-  function buildGridTexture(){
-    var c = document.createElement('canvas');
-    c.width = 256; c.height = 256;
-    var tctx = c.getContext('2d');
-    tctx.strokeStyle = 'rgba(255,45,70,0.95)';
-    tctx.lineWidth = 3;
-    var cell = 32;
-    for(var i=0; i<=256; i+=cell){
-      tctx.beginPath(); tctx.moveTo(i,0); tctx.lineTo(i,256); tctx.stroke();
-      tctx.beginPath(); tctx.moveTo(0,i); tctx.lineTo(256,i); tctx.stroke();
-    }
-    var tex = new THREE.CanvasTexture(c);
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    return tex;
-  }
-  var gridOpts = {transparent: true, opacity: 0.8, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false};
+  // ---- ściana: prawdziwe świecące RURKI 3D (jak klingi świetlnego miecza),
+  // nie płaska tekstura z liniami — siatka złożona z cylindrów.
+  function buildNeonTubeGrid(width, height, spacing, color){
+    var group = new THREE.Group();
+    var coreMat = new THREE.MeshBasicMaterial({color: color});
+    var glowMat = new THREE.MeshBasicMaterial({
+      color: color, transparent: true, opacity: 0.28,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    });
+    var coreR = 0.017, glowR = 0.05;
+    var cols = Math.round(width / spacing), rows = Math.round(height / spacing);
 
-  var wallTex = buildGridTexture(); wallTex.repeat.set(4, 3);
-  var wall = new THREE.Mesh(
-    new THREE.PlaneGeometry(2.6, 2.1),
-    new THREE.MeshBasicMaterial(Object.assign({map: wallTex}, gridOpts))
-  );
+    for(var i = 0; i <= cols; i++){
+      var x = -width/2 + i*spacing;
+      var core = new THREE.Mesh(new THREE.CylinderGeometry(coreR, coreR, height, 8), coreMat);
+      core.position.x = x;
+      group.add(core);
+      var glow = new THREE.Mesh(new THREE.CylinderGeometry(glowR, glowR, height, 8), glowMat);
+      glow.position.x = x;
+      group.add(glow);
+    }
+    for(var j = 0; j <= rows; j++){
+      var y = -height/2 + j*spacing;
+      var coreH = new THREE.Mesh(new THREE.CylinderGeometry(coreR, coreR, width, 8), coreMat);
+      coreH.rotation.z = Math.PI / 2;
+      coreH.position.y = y;
+      group.add(coreH);
+      var glowH = new THREE.Mesh(new THREE.CylinderGeometry(glowR, glowR, width, 8), glowMat);
+      glowH.rotation.z = Math.PI / 2;
+      glowH.position.y = y;
+      group.add(glowH);
+    }
+    return group;
+  }
+
+  var wall = buildNeonTubeGrid(2.6, 2.1, 0.34, 0xff1440);
   wall.position.set(-0.65, 0.15, -0.7);
   scene.add(wall);
 
@@ -1271,31 +1282,26 @@
   // znakiem wodnym Alamy, bez licencji do użycia na stronie klienta).
   function buildPadlockTexture(){
     var c = document.createElement('canvas');
-    c.width = 420; c.height = 460;
+    c.width = 420; c.height = 580;
     var tctx = c.getContext('2d');
     var neon = '#39ff8a';
     tctx.lineCap = 'round';
     tctx.lineJoin = 'round';
+
+    // kabłąk — pełna, ZAMKNIĘTA pętla (prosty, niezawodny kształt zamiast
+    // wcześniejszego "otwartego" łuku, który renderował się źle u góry)
     tctx.strokeStyle = neon;
     tctx.shadowColor = neon;
-
-    // kabłąk — OTWARTY: prawy koniec wchodzi w korpus, lewy odchylony na bok
-    var scx = 210, scy = 126, sr = 72;
-    var startAng = 8 * Math.PI / 180;
-    var endAng = 195 * Math.PI / 180;
-    tctx.lineWidth = 16;
+    var scx = 210, scy = 140, sr = 78;
+    tctx.lineWidth = 17;
     tctx.shadowBlur = 22;
     tctx.beginPath();
-    tctx.arc(scx, scy, sr, startAng, endAng, false);
+    tctx.arc(scx, scy, sr, Math.PI, Math.PI * 2, false);
     tctx.stroke();
-    var rx = scx + sr * Math.cos(startAng), ry = scy + sr * Math.sin(startAng);
-    tctx.beginPath(); tctx.moveTo(rx, ry); tctx.lineTo(rx, 156); tctx.stroke();
-    var lx = scx + sr * Math.cos(endAng), ly = scy + sr * Math.sin(endAng);
-    tctx.beginPath(); tctx.moveTo(lx, ly); tctx.lineTo(lx - 14, ly - 18); tctx.stroke();
 
     // korpus — zaokrąglony prostokąt
-    var bx = 95, by = 150, bw = 230, bh = 200, br = 26;
-    tctx.lineWidth = 12;
+    var bx = 108, by = 198, bw = 204, bh = 186, br = 24;
+    tctx.lineWidth = 13;
     tctx.shadowBlur = 18;
     tctx.beginPath();
     tctx.moveTo(bx + br, by);
@@ -1310,41 +1316,42 @@
     tctx.closePath();
     tctx.stroke();
 
-    // napis
-    tctx.shadowBlur = 10;
-    tctx.fillStyle = 'rgba(235,255,244,0.95)';
-    tctx.textAlign = 'center';
-    tctx.textBaseline = 'middle';
-    tctx.font = '700 30px "IBM Plex Mono", monospace';
-    tctx.fillText('SOLUTION', bx + bw / 2, by + 58);
-    tctx.fillText('PRIVACY', bx + bw / 2, by + 94);
-
     // otwór na klucz
-    tctx.shadowBlur = 6;
+    tctx.shadowBlur = 8;
     tctx.fillStyle = 'rgba(4,16,10,0.95)';
     tctx.beginPath();
-    tctx.arc(bx + bw / 2, by + 140, 15, 0, Math.PI * 2);
+    tctx.arc(bx + bw / 2, by + 78, 17, 0, Math.PI * 2);
     tctx.fill();
     tctx.beginPath();
-    tctx.moveTo(bx + bw / 2 - 10, by + 150);
-    tctx.lineTo(bx + bw / 2 + 10, by + 150);
-    tctx.lineTo(bx + bw / 2 + 5, by + 180);
-    tctx.lineTo(bx + bw / 2 - 5, by + 180);
+    tctx.moveTo(bx + bw / 2 - 11, by + 90);
+    tctx.lineTo(bx + bw / 2 + 11, by + 90);
+    tctx.lineTo(bx + bw / 2 + 6, by + 130);
+    tctx.lineTo(bx + bw / 2 - 6, by + 130);
     tctx.closePath();
     tctx.fill();
+
+    // napis — pod kłódką, różowy neon (jak na wzorze)
+    var pink = '#ff4fc3';
+    tctx.shadowColor = pink;
+    tctx.shadowBlur = 14;
+    tctx.fillStyle = pink;
+    tctx.textAlign = 'center';
+    tctx.textBaseline = 'middle';
+    tctx.font = '700 36px "IBM Plex Mono", monospace';
+    tctx.fillText('SOLUTION', 210, 470);
+    tctx.fillText('PRIVACY', 210, 516);
 
     return new THREE.CanvasTexture(c);
   }
 
   var lockGroup = new THREE.Group();
   var lockPlane = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.3, 1.3 * (460 / 420)),
+    new THREE.PlaneGeometry(1.3, 1.3 * (580 / 420)),
     new THREE.MeshBasicMaterial({map: buildPadlockTexture(), transparent: true, side: THREE.DoubleSide})
   );
   lockGroup.add(lockPlane);
 
-  lockGroup.position.x = 0.65;
-  lockGroup.rotation.y = 30 * Math.PI / 180; // przechylenie W BOK w 3D
+  lockGroup.position.x = 0.65; // po prawej, za ścianą, przodem do widza (bez przechyłu)
   scene.add(lockGroup);
 
   // ---- pociski: klawisze klawiatury i klucze 3D, lecą w barierę i odbijają się ----
