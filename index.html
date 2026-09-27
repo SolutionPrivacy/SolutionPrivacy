@@ -488,6 +488,45 @@
     color:var(--text-dim);
   }
 
+  /* ---------- rozdzielacz sekcji ---------- */
+  .section-divider{
+    position:relative;
+    height:2px;
+    margin:8px 0 0;
+    background:linear-gradient(90deg, transparent, var(--accent-2) 20%, var(--accent) 50%, var(--accent-2) 80%, transparent);
+    opacity:.55;
+    overflow:visible;
+  }
+  .section-divider::before,
+  .section-divider::after{
+    content:'';
+    position:absolute;
+    top:50%;
+    width:7px;height:7px;
+    background:var(--accent-2);
+    transform:translateY(-50%) rotate(45deg);
+    box-shadow:0 0 10px var(--accent-2);
+  }
+  .section-divider::before{left:calc(50% - 70px);}
+  .section-divider::after{left:calc(50% + 63px);}
+  .section-divider span{
+    position:absolute;
+    top:50%;
+    left:-80px;
+    width:80px;height:2px;
+    background:linear-gradient(90deg, transparent, #fff, transparent);
+    transform:translateY(-50%);
+    animation:dividerScan 6s linear infinite;
+    opacity:.9;
+  }
+  @keyframes dividerScan{
+    0%{left:-80px;}
+    100%{left:100%;}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .section-divider span{animation:none;display:none;}
+  }
+
   /* Karty/panele "wyskakują" od dołu przy przewijaniu do nich.
      Sam czas/łagodzenie przejścia ustawia .service / .contact-panel
      (żeby nie kłócić się z ich innymi regułami transition o tę samą
@@ -835,6 +874,8 @@
     <div class="hero-scene"><canvas id="logo3d" aria-hidden="true"></canvas></div>
   </section>
 
+  <div class="section-divider"><span></span></div>
+
   <section class="block" id="uslugi">
     <div class="section-head">
       <h2 class="section-title" data-text="Zakres usług">Zakres usług</h2>
@@ -884,6 +925,8 @@
     </div>
   </section>
 
+  <div class="section-divider"><span></span></div>
+
   <section class="block" id="proces">
     <div class="section-head">
       <h2 class="section-title" data-text="Jak pracujemy">Jak pracujemy</h2>
@@ -914,6 +957,8 @@
     </div>
   </section>
 
+  <div class="section-divider"><span></span></div>
+
   <section class="block" id="cennik">
     <div class="section-head">
       <h2 class="section-title" data-text="Wycena projektu">Wycena projektu</h2>
@@ -935,6 +980,8 @@
       </div>
     </div>
   </section>
+
+  <div class="section-divider"><span></span></div>
 
   <section class="block" id="faq">
     <div class="section-head">
@@ -965,6 +1012,8 @@
       </details>
     </div>
   </section>
+
+  <div class="section-divider"><span></span></div>
 
   <section class="block" id="kontakt">
     <div class="section-head">
@@ -1334,11 +1383,13 @@
   camera.position.set(0, 1.4, 4);
   camera.lookAt(0, -0.3, -10);
 
-  function buildRainbowGridTexture(){
+  // Siatka w stylu cyberpunk: magenta + cyjan, żółty jako rzadki akcent
+  // (zamiast tęczy) — mocniejsze, bardziej "neon noir".
+  function buildCyberGridTexture(){
     var c = document.createElement('canvas');
     c.width = 256; c.height = 256;
     var tctx = c.getContext('2d');
-    var colors = ['#ff2d6e','#ff9d2d','#e6ff2d','#2dff6e','#2de6ff','#6e2dff','#ff2de6'];
+    var colors = ['#ff2ec4', '#00f0ff', '#ff2ec4', '#00f0ff', '#f4ff2e'];
     var cell = 32;
     tctx.lineWidth = 3;
     var idx = 0;
@@ -1353,24 +1404,32 @@
     return tex;
   }
 
-  var floorTex = buildRainbowGridTexture();
-  floorTex.repeat.set(14, 30);
+  // podłoga — ciągnie się przez cały "tunel"
+  var floorTex = buildCyberGridTexture();
+  floorTex.repeat.set(14, 46);
   var floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(50, 100),
-    new THREE.MeshBasicMaterial({map: floorTex, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide})
+    new THREE.PlaneGeometry(50, 140),
+    new THREE.MeshBasicMaterial({map: floorTex, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide})
   );
   floor.rotation.x = -Math.PI / 2;
-  floor.position.set(0, -1.6, -20);
+  floor.position.set(0, -1.6, -34);
   scene.add(floor);
 
-  var wallTex = buildRainbowGridTexture();
-  wallTex.repeat.set(14, 8);
-  var wall = new THREE.Mesh(
-    new THREE.PlaneGeometry(50, 26),
-    new THREE.MeshBasicMaterial({map: wallTex, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide})
-  );
-  wall.position.set(0, 6, -45);
-  scene.add(wall);
+  // seria świecących "bram" w głębi — kamera przelatuje przez nie kolejno
+  // podczas scrollowania, więc ruch w 3D jest wyraźnie widoczny
+  var gateTex = buildCyberGridTexture();
+  gateTex.repeat.set(6, 4);
+  var gateCount = 7, gateSpacing = 9;
+  var gates = [];
+  for(var gi = 0; gi < gateCount; gi++){
+    var gate = new THREE.Mesh(
+      new THREE.PlaneGeometry(15, 9),
+      new THREE.MeshBasicMaterial({map: gateTex, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide})
+    );
+    gate.position.set(0, 1.4, -6 - gi * gateSpacing);
+    scene.add(gate);
+    gates.push(gate);
+  }
 
   function resize(){
     var w = window.innerWidth, h = window.innerHeight;
@@ -1399,10 +1458,10 @@
   var lookTarget = new THREE.Vector3(0, -0.3, -10);
 
   function applyCamera(){
-    var targetZ = 4 - scrollProgress() * 32; // od 4 (góra strony) do -28 (dół strony)
+    var targetZ = 4 - scrollProgress() * 70; // od 4 (góra) do -66 (dół) — przelot przez wszystkie bramy
     var targetX = baseX + mouseX * 0.6;
     var targetY = baseY - mouseY * 0.3;
-    camera.position.z += (targetZ - camera.position.z) * 0.05;
+    camera.position.z += (targetZ - camera.position.z) * 0.08;
     camera.position.x += (targetX - camera.position.x) * 0.05;
     camera.position.y += (targetY - camera.position.y) * 0.05;
     camera.lookAt(lookTarget);
@@ -1411,7 +1470,7 @@
   if(reducedMotion){
     // bez ciągłej animacji, ale scroll (akcja użytkownika) dalej porusza kamerą
     window.addEventListener('scroll', function(){
-      camera.position.z = 4 - scrollProgress() * 32;
+      camera.position.z = 4 - scrollProgress() * 70;
       camera.lookAt(lookTarget);
       renderer.render(scene, camera);
     }, {passive: true});
