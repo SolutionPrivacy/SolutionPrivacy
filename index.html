@@ -1234,44 +1234,57 @@
     tctx.strokeStyle = neon;
     tctx.shadowColor = neon;
 
+    // podwójny przebieg: szeroka, miękka poświata pod spodem + ostry,
+    // jasny rdzeń na wierzchu — dzięki temu neon świeci wyraźnie mocniej
+    function neonStroke(drawPath, width, blur){
+      tctx.globalAlpha = 0.5;
+      tctx.lineWidth = width * 2.4;
+      tctx.shadowBlur = blur * 2.4;
+      drawPath();
+      tctx.globalAlpha = 1;
+      tctx.lineWidth = width;
+      tctx.shadowBlur = blur;
+      drawPath();
+    }
+
     // kabłąk — pełna, zamknięta pętla
     var scx = 210, scy = 130, sr = 78;
-    tctx.lineWidth = 17;
-    tctx.shadowBlur = 24;
-    tctx.beginPath();
-    tctx.arc(scx, scy, sr, Math.PI, Math.PI * 2, false);
-    tctx.stroke();
+    neonStroke(function(){
+      tctx.beginPath();
+      tctx.arc(scx, scy, sr, Math.PI, Math.PI * 2, false);
+      tctx.stroke();
+    }, 17, 24);
 
     // korpus — zaokrąglony prostokąt
     var bx = 108, by = 188, bw = 204, bh = 186, br = 24;
-    tctx.lineWidth = 13;
-    tctx.shadowBlur = 20;
-    tctx.beginPath();
-    tctx.moveTo(bx + br, by);
-    tctx.lineTo(bx + bw - br, by);
-    tctx.arcTo(bx + bw, by, bx + bw, by + br, br);
-    tctx.lineTo(bx + bw, by + bh - br);
-    tctx.arcTo(bx + bw, by + bh, bx + bw - br, by + bh, br);
-    tctx.lineTo(bx + br, by + bh);
-    tctx.arcTo(bx, by + bh, bx, by + bh - br, br);
-    tctx.lineTo(bx, by + br);
-    tctx.arcTo(bx, by, bx + br, by, br);
-    tctx.closePath();
-    tctx.stroke();
+    neonStroke(function(){
+      tctx.beginPath();
+      tctx.moveTo(bx + br, by);
+      tctx.lineTo(bx + bw - br, by);
+      tctx.arcTo(bx + bw, by, bx + bw, by + br, br);
+      tctx.lineTo(bx + bw, by + bh - br);
+      tctx.arcTo(bx + bw, by + bh, bx + bw - br, by + bh, br);
+      tctx.lineTo(bx + br, by + bh);
+      tctx.arcTo(bx, by + bh, bx, by + bh - br, br);
+      tctx.lineTo(bx, by + br);
+      tctx.arcTo(bx, by, bx + br, by, br);
+      tctx.closePath();
+      tctx.stroke();
+    }, 13, 20);
 
     // otwór na klucz — kontur, jak reszta ikony (nie wypełniony kształt)
-    tctx.lineWidth = 9;
-    tctx.shadowBlur = 12;
-    tctx.beginPath();
-    tctx.arc(bx + bw / 2, by + 78, 15, 0, Math.PI * 2);
-    tctx.stroke();
-    tctx.beginPath();
-    tctx.moveTo(bx + bw / 2 - 10, by + 88);
-    tctx.lineTo(bx + bw / 2 + 10, by + 88);
-    tctx.lineTo(bx + bw / 2 + 5, by + 126);
-    tctx.lineTo(bx + bw / 2 - 5, by + 126);
-    tctx.closePath();
-    tctx.stroke();
+    neonStroke(function(){
+      tctx.beginPath();
+      tctx.arc(bx + bw / 2, by + 78, 15, 0, Math.PI * 2);
+      tctx.stroke();
+      tctx.beginPath();
+      tctx.moveTo(bx + bw / 2 - 10, by + 88);
+      tctx.lineTo(bx + bw / 2 + 10, by + 88);
+      tctx.lineTo(bx + bw / 2 + 5, by + 126);
+      tctx.lineTo(bx + bw / 2 - 5, by + 126);
+      tctx.closePath();
+      tctx.stroke();
+    }, 9, 12);
 
     return new THREE.CanvasTexture(c);
   }
@@ -1281,6 +1294,25 @@
     new THREE.MeshBasicMaterial({map: buildPadlockTexture(), transparent: true, side: THREE.DoubleSide})
   );
   scene.add(lockPlane);
+
+  // dodatkowa poświata w tle ikony — miękka niebieska kula światła
+  function buildGlowSprite(){
+    var c = document.createElement('canvas');
+    c.width = 256; c.height = 256;
+    var gctx = c.getContext('2d');
+    var grad = gctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+    grad.addColorStop(0, 'rgba(79,216,255,0.55)');
+    grad.addColorStop(1, 'rgba(79,216,255,0)');
+    gctx.fillStyle = grad;
+    gctx.fillRect(0, 0, 256, 256);
+    return new THREE.CanvasTexture(c);
+  }
+  var glowSprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: buildGlowSprite(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
+  }));
+  glowSprite.scale.set(2.6, 2.6, 1);
+  glowSprite.position.z = -0.05;
+  scene.add(glowSprite);
 
   function resize(){
     var w = wrap.clientWidth || 1;
@@ -1298,7 +1330,10 @@
     var t = 0;
     (function animate(){
       t += 0.022;
-      lockPlane.position.y = Math.sin(t) * 0.16; // kołysanie góra-dół
+      var y = Math.sin(t) * 0.16;
+      lockPlane.position.y = y; // kołysanie góra-dół
+      lockPlane.rotation.y = Math.sin(t * 0.6) * 0.3; // lekki obrót wokół własnej osi
+      glowSprite.position.y = y;
       renderer.render(scene, camera);
       requestAnimationFrame(animate);
     })();
