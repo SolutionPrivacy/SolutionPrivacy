@@ -1264,82 +1264,87 @@
   // (podłogę pod kłódką daje teraz wspólne tło całej strony — patrz niżej;
   // druga, osobna podłoga tutaj tylko robiła bałagan z dwiema siatkami)
 
-  // ---- kłódka: zielona, z nazwą firmy i otworem na klucz, obrócona 30° w bok ----
-  var lockColor = 0x2be878;
-  var lockFillMat = new THREE.MeshPhongMaterial({
-    color: lockColor, transparent: true, opacity: 0.72,
-    shininess: 90, specular: 0xbdffe0, side: THREE.DoubleSide
-  });
-  var lockEdgeMat = new THREE.LineBasicMaterial({color: 0xa8ffce});
-  var lockGroup = new THREE.Group();
-
-  var bodyGeo = new THREE.BoxGeometry(0.86, 0.8, 0.36);
-  lockGroup.add(new THREE.Mesh(bodyGeo, lockFillMat));
-  lockGroup.add(new THREE.LineSegments(new THREE.EdgesGeometry(bodyGeo), lockEdgeMat));
-  // druga, lekko większa ramka — efekt podwójnego obrysu/faski jak na wzorze
-  var bezelWire = new THREE.LineSegments(new THREE.EdgesGeometry(bodyGeo), new THREE.LineBasicMaterial({color: 0xa8ffce, transparent: true, opacity: 0.35}));
-  bezelWire.scale.set(1.1, 1.1, 1.02);
-  lockGroup.add(bezelWire);
-
-  // kabłąk — prosta, zamknięta pętla poprawnie osadzona w korpusie
-  // (bezpieczny wybór: wcześniejsza próba "otwartej" pozy wyszła krzywo)
-  var shackleGeo = new THREE.TorusGeometry(0.28, 0.05, 8, 24, Math.PI);
-  var shackle = new THREE.Mesh(shackleGeo, lockFillMat);
-  shackle.rotation.z = Math.PI;
-  shackle.position.y = 0.4;
-  lockGroup.add(shackle);
-  var shackleWire = new THREE.LineSegments(new THREE.EdgesGeometry(shackleGeo), lockEdgeMat);
-  shackleWire.rotation.copy(shackle.rotation);
-  shackleWire.position.copy(shackle.position);
-  lockGroup.add(shackleWire);
-
-  function buildLabelTexture(){
+  // ---- kłódka: gotowa grafika 2D (w pełni kontrolowana) na płaszczyźnie 3D,
+  // zamiast budowania kształtu z osobnych brył — bezpieczniejsze i wierniejsze
+  // wzorowi niż poprzednie próby z geometrią. Własny rysunek w tym samym
+  // stylu (nie mogę użyć przesłanego pliku — to zdjęcie stockowe ze
+  // znakiem wodnym Alamy, bez licencji do użycia na stronie klienta).
+  function buildPadlockTexture(){
     var c = document.createElement('canvas');
-    c.width = 512; c.height = 256;
+    c.width = 420; c.height = 460;
     var tctx = c.getContext('2d');
+    var neon = '#39ff8a';
+    tctx.lineCap = 'round';
+    tctx.lineJoin = 'round';
+    tctx.strokeStyle = neon;
+    tctx.shadowColor = neon;
+
+    // kabłąk — OTWARTY: prawy koniec wchodzi w korpus, lewy odchylony na bok
+    var scx = 210, scy = 126, sr = 72;
+    var startAng = 8 * Math.PI / 180;
+    var endAng = 195 * Math.PI / 180;
+    tctx.lineWidth = 16;
+    tctx.shadowBlur = 22;
+    tctx.beginPath();
+    tctx.arc(scx, scy, sr, startAng, endAng, false);
+    tctx.stroke();
+    var rx = scx + sr * Math.cos(startAng), ry = scy + sr * Math.sin(startAng);
+    tctx.beginPath(); tctx.moveTo(rx, ry); tctx.lineTo(rx, 156); tctx.stroke();
+    var lx = scx + sr * Math.cos(endAng), ly = scy + sr * Math.sin(endAng);
+    tctx.beginPath(); tctx.moveTo(lx, ly); tctx.lineTo(lx - 14, ly - 18); tctx.stroke();
+
+    // korpus — zaokrąglony prostokąt
+    var bx = 95, by = 150, bw = 230, bh = 200, br = 26;
+    tctx.lineWidth = 12;
+    tctx.shadowBlur = 18;
+    tctx.beginPath();
+    tctx.moveTo(bx + br, by);
+    tctx.lineTo(bx + bw - br, by);
+    tctx.arcTo(bx + bw, by, bx + bw, by + br, br);
+    tctx.lineTo(bx + bw, by + bh - br);
+    tctx.arcTo(bx + bw, by + bh, bx + bw - br, by + bh, br);
+    tctx.lineTo(bx + br, by + bh);
+    tctx.arcTo(bx, by + bh, bx, by + bh - br, br);
+    tctx.lineTo(bx, by + br);
+    tctx.arcTo(bx, by, bx + br, by, br);
+    tctx.closePath();
+    tctx.stroke();
+
+    // napis
+    tctx.shadowBlur = 10;
     tctx.fillStyle = 'rgba(235,255,244,0.95)';
     tctx.textAlign = 'center';
     tctx.textBaseline = 'middle';
-    tctx.font = '700 64px "IBM Plex Mono", monospace';
-    tctx.fillText('SOLUTION', 256, 90);
-    tctx.fillText('PRIVACY', 256, 172);
-    return new THREE.CanvasTexture(c);
-  }
-  var label = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.72, 0.36),
-    new THREE.MeshBasicMaterial({map: buildLabelTexture(), transparent: true})
-  );
-  label.position.set(0, 0.15, 0.185);
-  lockGroup.add(label);
+    tctx.font = '700 30px "IBM Plex Mono", monospace';
+    tctx.fillText('SOLUTION', bx + bw / 2, by + 58);
+    tctx.fillText('PRIVACY', bx + bw / 2, by + 94);
 
-  // otwór na klucz — wyraźny szczegół, żeby bryła czytała się jako kłódka
-  function buildKeyholeTexture(){
-    var c = document.createElement('canvas');
-    c.width = 128; c.height = 128;
-    var tctx = c.getContext('2d');
-    tctx.fillStyle = 'rgba(6,20,14,0.92)';
+    // otwór na klucz
+    tctx.shadowBlur = 6;
+    tctx.fillStyle = 'rgba(4,16,10,0.95)';
     tctx.beginPath();
-    tctx.arc(64, 42, 19, 0, Math.PI * 2);
+    tctx.arc(bx + bw / 2, by + 140, 15, 0, Math.PI * 2);
     tctx.fill();
     tctx.beginPath();
-    tctx.moveTo(51, 54);
-    tctx.lineTo(77, 54);
-    tctx.lineTo(69, 92);
-    tctx.lineTo(59, 92);
+    tctx.moveTo(bx + bw / 2 - 10, by + 150);
+    tctx.lineTo(bx + bw / 2 + 10, by + 150);
+    tctx.lineTo(bx + bw / 2 + 5, by + 180);
+    tctx.lineTo(bx + bw / 2 - 5, by + 180);
     tctx.closePath();
     tctx.fill();
+
     return new THREE.CanvasTexture(c);
   }
-  var keyhole = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.2, 0.2),
-    new THREE.MeshBasicMaterial({map: buildKeyholeTexture(), transparent: true})
+
+  var lockGroup = new THREE.Group();
+  var lockPlane = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.3, 1.3 * (460 / 420)),
+    new THREE.MeshBasicMaterial({map: buildPadlockTexture(), transparent: true, side: THREE.DoubleSide})
   );
-  keyhole.position.set(0, -0.2, 0.185);
-  lockGroup.add(keyhole);
+  lockGroup.add(lockPlane);
 
   lockGroup.position.x = 0.65;
-  lockGroup.rotation.y = 30 * Math.PI / 180; // przechylenie W BOK w 3D, nie przekrzywienie w płaszczyźnie
-  lockGroup.scale.setScalar(1.4);
+  lockGroup.rotation.y = 30 * Math.PI / 180; // przechylenie W BOK w 3D
   scene.add(lockGroup);
 
   // ---- pociski: klawisze klawiatury i klucze 3D, lecą w barierę i odbijają się ----
