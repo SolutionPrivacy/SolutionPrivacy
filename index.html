@@ -205,6 +205,21 @@
     gap:28px;
   }
   .hero-copy{perspective:900px;}
+  .hero-title{
+    grid-column:1/-1;
+    text-align:center;
+    position:relative;
+    padding-block:4px 10px;
+  }
+  .hero-title::before{
+    content:'';
+    position:absolute;
+    inset:-14% -8%;
+    background:radial-gradient(65% 100% at 50% 50%, #05060fb8, transparent 76%);
+    z-index:-1;
+    pointer-events:none;
+  }
+  .hero-title .brand-drop{justify-content:center;}
   .hero-scene{
     position:relative;
     width:100%;
@@ -238,7 +253,7 @@
     gap:.06em;
     font-family:var(--display-cyber);
     font-weight:800;
-    font-size:clamp(1.5rem,4.6vw,2.5rem);
+    font-size:clamp(1.8rem,6vw,3.6rem);
     letter-spacing:.01em;
     line-height:1;
     margin:0 0 20px;
@@ -852,13 +867,15 @@
   </header>
 
   <section class="hero">
-    <div class="hero-copy">
+    <div class="hero-title">
       <div class="eyebrow">tworzenie stron internetowych</div>
 
       <div class="brand-drop" aria-hidden="true">
         <span>S</span><span>O</span><span>L</span><span>U</span><span>T</span><span>I</span><span>O</span><span>N</span><span class="dot">.</span><span>P</span><span>R</span><span>I</span><span>V</span><span>A</span><span>C</span><span>Y</span>
       </div>
+    </div>
 
+    <div class="hero-copy">
       <h1>Zaufanie zaczyna się od dobrej <span class="accent">strony</span>.</h1>
       <p class="lede">Solution Privacy projektuje i wdraża strony internetowe, sklepy online oraz systemy wsparcia — szybkie, bezpieczne i skrojone pod Twój biznes, od pierwszego szkicu po wdrożenie.</p>
 
@@ -1519,8 +1536,8 @@
       map: buildGlowTexture(color), transparent: true, depthWrite: false,
       blending: THREE.AdditiveBlending, opacity: 0.55
     }));
-    pool.scale.set(w * 2.6, w * 1.2, 1);
-    pool.position.set(0, 0.02, d * 0.3);
+    pool.scale.set(w * 2.8, w * 1.6, 1);
+    pool.position.set(0, 0.03, 0);
     group.add(pool);
     return group;
   }
@@ -1541,7 +1558,7 @@
       var zCenter = -8 - s * slotLen - slotLen / 2;
       var z = zCenter + (Math.random() - 0.5) * slotLen * 0.3;
       var xOff = STREET_HALF + Math.random() * 5 + w / 2 + (Math.random() < 0.3 ? Math.random() * 4 : 0);
-      building.position.set(side * xOff, FLOOR_Y, z);
+      building.position.set(side * xOff, FLOOR_Y - 0.06, z);
       scene.add(building);
     }
   });
@@ -1575,10 +1592,14 @@
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
     return tex;
   }
+  // podłoga jest CELOWO dużo szersza niż sama ulica z budynkami, żeby przy
+  // patrzeniu w stronę horyzontu pokrywała cały kadr aż po boki ekranu,
+  // zamiast kończyć się i odsłaniać pustkę za scenę
+  var FLOOR_WIDTH = 80;
   var floorTex = buildFloorTexture();
-  floorTex.repeat.set(Math.round((STREET_HALF * 2 + 4) / 3), Math.round((TUNNEL_LEN + 20) / 3));
+  floorTex.repeat.set(Math.round(FLOOR_WIDTH / 3), Math.round((TUNNEL_LEN + 20) / 3));
   var street = new THREE.Mesh(
-    new THREE.PlaneGeometry(STREET_HALF * 2 + 4, TUNNEL_LEN + 20),
+    new THREE.PlaneGeometry(FLOOR_WIDTH, TUNNEL_LEN + 20),
     new THREE.MeshBasicMaterial({map: floorTex, fog: true})
   );
   street.rotation.x = -Math.PI / 2;
