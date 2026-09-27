@@ -89,6 +89,8 @@
     background-size:140% 140%, 140% 140%, 140% 140%;
     animation:drift 34s ease-in-out infinite alternate;
     mix-blend-mode:screen;
+    transition:transform .6s ease-out;
+    will-change:transform;
   }
   .vignette{
     position:fixed;
@@ -1143,6 +1145,21 @@
 
 <script>
 (function(){
+  // Paralaksa poświat w tle pod kursorem myszy — delikatne wrażenie głębi.
+  if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if(!window.matchMedia || !window.matchMedia('(pointer: fine)').matches) return;
+  var field = document.querySelector('.bg-field');
+  if(!field) return;
+  document.addEventListener('mousemove', function(e){
+    var x = (e.clientX / window.innerWidth - 0.5) * 18;
+    var y = (e.clientY / window.innerHeight - 0.5) * 18;
+    field.style.transform = 'translate(' + (-x) + 'px,' + (-y) + 'px)';
+  }, {passive: true});
+})();
+</script>
+
+<script>
+(function(){
   var canvas = document.getElementById('matrix-canvas');
   var ctx = canvas.getContext('2d');
   var glyphs = 'アイウエオカキクケコサシスセソタチツテトナニヌネノ0123456789<>{}[]/#$%';
@@ -1364,11 +1381,45 @@
   window.addEventListener('resize', resize);
   resize();
 
+  // przewijanie strony = lot w głąb neonowego tunelu
+  function scrollProgress(){
+    var doc = document.documentElement;
+    var max = doc.scrollHeight - window.innerHeight;
+    return max > 0 ? Math.min(1, Math.max(0, window.scrollY / max)) : 0;
+  }
+
+  // delikatna paralaksa pod kursorem myszy
+  var mouseX = 0, mouseY = 0;
+  document.addEventListener('mousemove', function(e){
+    mouseX = (e.clientX / window.innerWidth) * 2 - 1;
+    mouseY = (e.clientY / window.innerHeight) * 2 - 1;
+  }, {passive: true});
+
+  var baseX = 0, baseY = 1.4;
+  var lookTarget = new THREE.Vector3(0, -0.3, -10);
+
+  function applyCamera(){
+    var targetZ = 4 - scrollProgress() * 32; // od 4 (góra strony) do -28 (dół strony)
+    var targetX = baseX + mouseX * 0.6;
+    var targetY = baseY - mouseY * 0.3;
+    camera.position.z += (targetZ - camera.position.z) * 0.05;
+    camera.position.x += (targetX - camera.position.x) * 0.05;
+    camera.position.y += (targetY - camera.position.y) * 0.05;
+    camera.lookAt(lookTarget);
+  }
+
   if(reducedMotion){
+    // bez ciągłej animacji, ale scroll (akcja użytkownika) dalej porusza kamerą
+    window.addEventListener('scroll', function(){
+      camera.position.z = 4 - scrollProgress() * 32;
+      camera.lookAt(lookTarget);
+      renderer.render(scene, camera);
+    }, {passive: true});
     renderer.render(scene, camera);
   } else {
     (function animate(){
       floorTex.offset.y -= 0.0015;
+      applyCamera();
       renderer.render(scene, camera);
       requestAnimationFrame(animate);
     })();
