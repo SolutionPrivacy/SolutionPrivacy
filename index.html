@@ -97,8 +97,8 @@
     inset:0;
     z-index:-2;
     background:
-      linear-gradient(180deg, #07070fe6 0%, #07070f78 22%, #07070f5c 55%, #07070fcc 100%),
-      radial-gradient(120% 70% at 50% 0%, transparent 38%, #07070f 97%);
+      radial-gradient(130% 90% at 50% 45%, transparent 38%, #07070f70 72%, #07070fe8 100%),
+      linear-gradient(180deg, #07070fea 0%, transparent 18%, transparent 78%, #07070fdb 100%);
     pointer-events:none;
   }
 
@@ -426,7 +426,10 @@
   }
 
   /* ---------- section shell ---------- */
-  section.block{padding-block:64px 8px;}
+  section.block{
+    padding-block:64px 8px;
+    background:linear-gradient(180deg, transparent 0%, #05060fcc 10%, #05060fcc 90%, transparent 100%);
+  }
   .section-head{
     display:flex;
     align-items:baseline;
@@ -1375,38 +1378,45 @@
   if(!canvasEl) return;
 
   var reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // słabsze telefony (dotyk) dostają odchudzoną scenę, żeby nic się nie ciął
+  var lowPower = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
 
-  var renderer = new THREE.WebGLRenderer({canvas: canvasEl, alpha: true, antialias: true});
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  var renderer = new THREE.WebGLRenderer({canvas: canvasEl, alpha: true, antialias: !lowPower});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, lowPower ? 1.5 : 2));
 
   var scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0x03040a, 8, 58);
+  scene.fog = new THREE.Fog(0x03040a, 10, 118);
 
   var FLOOR_Y = -1.6;
-  var camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 200);
+  var camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 220);
   camera.position.set(0, FLOOR_Y + 0.55, 5);
   // celowo BRAK camera.lookAt() — domyślna orientacja patrzy wzdłuż -Z,
   // więc kamera nigdy się nie obraca, tylko jedzie prosto przed siebie.
 
-  var TUNNEL_LEN = 92;
+  var TUNNEL_LEN = 150;
   var STREET_HALF = 3.6;
-  var palette = ['#00ff9d', '#00ff9d', '#00f0ff', '#00f0ff', '#39ff14', '#ffb703', '#ff2ec4'];
+  var palette = ['#00ff9d', '#00f0ff', '#39ff14', '#ff2ec4', '#ffb703', '#c86bff'];
   var cityMeshes = [];
 
   // tekstura okien budynku — nieregularna siatka losowo zaświeconych okien
-  // + poziome i pionowe "kanały danych", żeby wzór nie był jednostajny
+  // + poziome i pionowe "kanały danych". Gęstość, liczba wierszy/kolumn i
+  // liczba linii losowana OSOBNO dla każdego budynku, żeby żadne dwa nie
+  // wyglądały tak samo.
   function buildWindowTexture(color){
     var c = document.createElement('canvas');
-    c.width = 64; c.height = 128;
+    c.width = 96; c.height = 176;
     var tctx = c.getContext('2d');
     tctx.fillStyle = '#05060c';
-    tctx.fillRect(0, 0, 64, 128);
-    var cols = 6, rows = 14, cw = 64 / cols, ch = 128 / rows;
+    tctx.fillRect(0, 0, 96, 176);
+    var cols = 5 + Math.floor(Math.random() * 5);
+    var rows = 9 + Math.floor(Math.random() * 10);
+    var cw = 96 / cols, ch = 176 / rows;
+    var density = 0.12 + Math.random() * 0.24;
     tctx.shadowColor = color;
     for(var r = 0; r < rows; r++){
       for(var cI = 0; cI < cols; cI++){
-        if(Math.random() < 0.24){
-          tctx.globalAlpha = 0.45 + Math.random() * 0.5;
+        if(Math.random() < density){
+          tctx.globalAlpha = 0.4 + Math.random() * 0.55;
           tctx.shadowBlur = 3;
           tctx.fillStyle = color;
           tctx.fillRect(cI * cw + 1, r * ch + 1, cw - 2, ch - 2);
@@ -1416,23 +1426,25 @@
     tctx.globalAlpha = 1;
     tctx.strokeStyle = color;
     tctx.shadowBlur = 6;
-    for(var l = 0; l < 3; l++){
-      if(Math.random() < 0.55){
-        var ly = Math.random() * 128;
-        tctx.lineWidth = 1.3;
+    var hLines = 1 + Math.floor(Math.random() * 4);
+    for(var l = 0; l < hLines; l++){
+      if(Math.random() < 0.6){
+        var ly = Math.random() * 176;
+        tctx.lineWidth = 1.1 + Math.random();
         tctx.beginPath();
         tctx.moveTo(0, ly);
-        tctx.lineTo(64, ly);
+        tctx.lineTo(96, ly);
         tctx.stroke();
       }
     }
-    for(var v = 0; v < 2; v++){
-      if(Math.random() < 0.7){
-        var vx = 6 + Math.random() * 52;
-        tctx.lineWidth = 2;
+    var vLines = 1 + Math.floor(Math.random() * 3);
+    for(var v = 0; v < vLines; v++){
+      if(Math.random() < 0.75){
+        var vx = 6 + Math.random() * 84;
+        tctx.lineWidth = 1.4 + Math.random() * 1.6;
         tctx.beginPath();
         tctx.moveTo(vx, 0);
-        tctx.lineTo(vx, 128);
+        tctx.lineTo(vx, 176);
         tctx.stroke();
       }
     }
@@ -1470,18 +1482,19 @@
     cityMeshes.push({mesh: mesh, tex: tex, phase: Math.random() * Math.PI * 2, speed: 0.5 + Math.random() * 1.3, flow: 0.12 + Math.random() * 0.4});
   }
 
-  // budynki złożone z 1-2 brył, czasem z masztem — dla większej różnorodności
-  // sylwetek zamiast jednakowych prostopadłościanów
+  // budynki złożone z 1-2 brył, maszt albo niski szeroki blok serwerowni —
+  // cztery różne sylwetki zamiast jednakowych prostopadłościanów
   function makeBuilding(h, w, d, color){
     var group = new THREE.Group();
     var archetype = Math.random();
-    if(archetype < 0.5){
+    if(archetype < 0.38){
       addBox(group, w, h, d, h / 2, color);
-    } else if(archetype < 0.8){
+    } else if(archetype < 0.64){
       var h1 = h * 0.62, h2 = h - h1;
+      var topColor = Math.random() < 0.4 ? palette[Math.floor(Math.random() * palette.length)] : color;
       addBox(group, w, h1, d, h1 / 2, color);
-      addBox(group, w * 0.62, h2, d * 0.62, h1 + h2 / 2, color);
-    } else {
+      addBox(group, w * 0.62, h2, d * 0.62, h1 + h2 / 2, topColor);
+    } else if(archetype < 0.84){
       addBox(group, w, h, d, h / 2, color);
       var mastH = h * 0.24;
       var mast = new THREE.Mesh(
@@ -1496,30 +1509,42 @@
       tip.scale.set(1.3, 1.3, 1);
       tip.position.set(0, h + mastH, 0);
       group.add(tip);
+    } else {
+      // niski, szeroki blok — sam wygląda jak fizyczna serwerownia
+      var slabH = h * 0.42;
+      addBox(group, w * 1.7, slabH, d * 1.7, slabH / 2, color);
     }
     // poświata u podstawy — kolor budynku "odbija się" w lśniącej podłodze
     var pool = new THREE.Sprite(new THREE.SpriteMaterial({
       map: buildGlowTexture(color), transparent: true, depthWrite: false,
       blending: THREE.AdditiveBlending, opacity: 0.55
     }));
-    pool.scale.set(w * 2.4, w * 1.1, 1);
+    pool.scale.set(w * 2.6, w * 1.2, 1);
     pool.position.set(0, 0.02, d * 0.3);
     group.add(pool);
     return group;
   }
 
-  // budynki — losowo po obu stronach ulicy, na całej długości "podróży"
-  for(var bi = 0; bi < 34; bi++){
-    var side = bi % 2 === 0 ? -1 : 1;
-    var h = 7 + Math.random() * 20;
-    var w = 2.1 + Math.random() * 2.8;
-    var d = 2.1 + Math.random() * 2.8;
-    var color = palette[Math.floor(Math.random() * palette.length)];
-    var building = makeBuilding(h, w, d, color);
-    var xOff = STREET_HALF + Math.random() * 4 + w / 2;
-    building.position.set(side * xOff, FLOOR_Y, -6 - Math.random() * TUNNEL_LEN);
-    scene.add(building);
-  }
+  // budynki — rozstawione w slotach po obu stronach ulicy (z jitterem, ale
+  // bez ryzyka, że dwa budynki "zlepią się" w jedną bryłę), więcej na
+  // słabszych telefonach ograniczamy dla płynności
+  var BUILDING_TOTAL = lowPower ? 26 : 48;
+  var perSide = Math.ceil(BUILDING_TOTAL / 2);
+  var slotLen = TUNNEL_LEN / perSide;
+  [-1, 1].forEach(function(side){
+    for(var s = 0; s < perSide; s++){
+      var h = 7 + Math.random() * 22;
+      var w = 2 + Math.random() * 3;
+      var d = 2 + Math.random() * 3;
+      var color = palette[Math.floor(Math.random() * palette.length)];
+      var building = makeBuilding(h, w, d, color);
+      var zCenter = -8 - s * slotLen - slotLen / 2;
+      var z = zCenter + (Math.random() - 0.5) * slotLen * 0.3;
+      var xOff = STREET_HALF + Math.random() * 5 + w / 2 + (Math.random() < 0.3 ? Math.random() * 4 : 0);
+      building.position.set(side * xOff, FLOOR_Y, z);
+      scene.add(building);
+    }
+  });
 
   // lśniąca podłoga z płytek + smugi połysku (jak mokra, glazurowana ulica)
   function buildFloorTexture(){
@@ -1607,7 +1632,8 @@
     depthWrite: false, blending: THREE.AdditiveBlending, fog: true
   });
   var rainDrops = [];
-  for(var ri = 0; ri < 140; ri++){
+  var RAIN_TOTAL = lowPower ? 60 : 150;
+  for(var ri = 0; ri < RAIN_TOTAL; ri++){
     var drop = new THREE.Sprite(rainMat);
     var len = 1.4 + Math.random() * 3.2;
     drop.scale.set(0.035, len, 1);
@@ -1635,6 +1661,7 @@
   }
 
   var targetZBase = 5;
+  var TRAVEL = TUNNEL_LEN - 8; // cały przejazd kończy się dokładnie na końcu kanionu
 
   function render(dt){
     var t = performance.now() / 1000;
@@ -1658,7 +1685,7 @@
 
   if(reducedMotion){
     window.addEventListener('scroll', function(){
-      camera.position.z = targetZBase - scrollProgress() * 88;
+      camera.position.z = targetZBase - scrollProgress() * TRAVEL;
       render(0.016);
     }, {passive: true});
     render(0.016);
@@ -1668,7 +1695,7 @@
       var now = performance.now();
       var dt = Math.min(0.05, (now - lastT) / 1000);
       lastT = now;
-      var targetZ = targetZBase - scrollProgress() * 88;
+      var targetZ = targetZBase - scrollProgress() * TRAVEL;
       camera.position.z += (targetZ - camera.position.z) * 0.08;
       render(dt);
       requestAnimationFrame(animate);
