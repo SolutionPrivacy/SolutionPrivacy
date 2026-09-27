@@ -127,7 +127,7 @@
     .bg-field{animation:none;}
   }
 
-  .wrap{max-width:920px;margin-inline:auto;}
+  .wrap{max-width:1140px;margin-inline:auto;}
 
   /* ---------- header / mark ---------- */
   header{
@@ -185,7 +185,21 @@
   .hero{
     padding-block:40px 40px;
     position:relative;
-    perspective:900px;
+    display:grid;
+    grid-template-columns:1fr;
+    align-items:center;
+    gap:28px;
+  }
+  .hero-copy{perspective:900px;}
+  .hero-scene{
+    position:relative;
+    width:100%;
+    aspect-ratio:6/5;
+    min-height:260px;
+  }
+  #logo3d{width:100%;height:100%;display:block;}
+  @media (min-width:980px){
+    .hero{grid-template-columns:1.15fr 0.9fr;}
   }
   .eyebrow{
     font-family:var(--mono);
@@ -301,23 +315,8 @@
       0 0 60px var(--accent-2);
   }
 
-  /* Prawdziwa bryła 3D (Three.js/WebGL) po prawej stronie — obraca się
-     sama, a dodatkowo podąża za kursorem myszy. Widoczna tylko tam, gdzie
-     obok kolumny treści jest realnie wolne miejsce. */
-  #logo3d-wrap{
-    position:fixed;
-    top:14%;
-    right:2%;
-    width:240px;
-    height:200px;
-    z-index:1;
-    pointer-events:none;
-    display:none;
-  }
-  #logo3d{width:100%;height:100%;display:block;}
-  @media (min-width:1260px){
-    #logo3d-wrap{display:block;}
-  }
+  /* Scena 3D (kłódka + bariera) jest teraz normalną kolumną obok tekstu
+     w hero — patrz .hero / .hero-scene wyżej, widoczna na każdym ekranie. */
 
   .lede{
     font-size:17px;
@@ -691,7 +690,6 @@
 <div class="bg-field"></div>
 <div class="vignette"></div>
 <div class="scanlines"></div>
-<div id="logo3d-wrap"><canvas id="logo3d" aria-hidden="true"></canvas></div>
 
 <div class="wrap">
 
@@ -701,25 +699,29 @@
   </header>
 
   <section class="hero">
-    <div class="eyebrow">tworzenie stron internetowych</div>
+    <div class="hero-copy">
+      <div class="eyebrow">tworzenie stron internetowych</div>
 
-    <div class="brand-drop" aria-hidden="true">
-      <span>S</span><span>O</span><span>L</span><span>U</span><span>T</span><span>I</span><span>O</span><span>N</span><span class="dot">.</span><span>P</span><span>R</span><span>I</span><span>V</span><span>A</span><span>C</span><span>Y</span>
+      <div class="brand-drop" aria-hidden="true">
+        <span>S</span><span>O</span><span>L</span><span>U</span><span>T</span><span>I</span><span>O</span><span>N</span><span class="dot">.</span><span>P</span><span>R</span><span>I</span><span>V</span><span>A</span><span>C</span><span>Y</span>
+      </div>
+
+      <h1>Zaufanie zaczyna się od dobrej <span class="accent">strony</span>.</h1>
+      <p class="lede">Solution Privacy projektuje i wdraża strony internetowe, sklepy online oraz systemy wsparcia — szybkie, bezpieczne i skrojone pod Twój biznes, od pierwszego szkicu po wdrożenie.</p>
+
+      <div class="cta-row">
+        <a class="btn btn-primary" href="#kontakt">Umów rozmowę →</a>
+        <a class="btn btn-ghost" href="#uslugi">Zobacz zakres usług</a>
+      </div>
+
+      <div class="badges">
+        <div class="badge"><span class="k">SSL</span><span class="v">Każda strona z certyfikatem szyfrowania</span></div>
+        <div class="badge"><span class="k">RODO</span><span class="v">Zgodność z ochroną danych od podstaw projektu</span></div>
+        <div class="badge"><span class="k">&lt;14 dni</span><span class="v">Od briefu do wdrożenia pierwszej wersji</span></div>
+      </div>
     </div>
 
-    <h1>Zaufanie zaczyna się od dobrej <span class="accent">strony</span>.</h1>
-    <p class="lede">Solution Privacy projektuje i wdraża strony internetowe, sklepy online oraz systemy wsparcia — szybkie, bezpieczne i skrojone pod Twój biznes, od pierwszego szkicu po wdrożenie.</p>
-
-    <div class="cta-row">
-      <a class="btn btn-primary" href="#kontakt">Umów rozmowę →</a>
-      <a class="btn btn-ghost" href="#uslugi">Zobacz zakres usług</a>
-    </div>
-
-    <div class="badges">
-      <div class="badge"><span class="k">SSL</span><span class="v">Każda strona z certyfikatem szyfrowania</span></div>
-      <div class="badge"><span class="k">RODO</span><span class="v">Zgodność z ochroną danych od podstaw projektu</span></div>
-      <div class="badge"><span class="k">&lt;14 dni</span><span class="v">Od briefu do wdrożenia pierwszej wersji</span></div>
-    </div>
+    <div class="hero-scene"><canvas id="logo3d" aria-hidden="true"></canvas></div>
   </section>
 
   <section class="block" id="uslugi">
@@ -1071,8 +1073,8 @@
   // czerwona neonowa siatka (firewall/pole siłowe) — klawisze i klucze
   // 3D lecą w barierę i odbijają się, nigdy jej nie przechodząc.
   if(typeof THREE === 'undefined') return;
-  var wrap = document.getElementById('logo3d-wrap');
   var canvasEl = document.getElementById('logo3d');
+  var wrap = canvasEl ? canvasEl.parentElement : null;
   if(!wrap || !canvasEl) return;
 
   var reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1081,8 +1083,18 @@
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 
   var scene = new THREE.Scene();
-  var camera = new THREE.PerspectiveCamera(45, 1.2, 0.1, 100);
+  var camera = new THREE.PerspectiveCamera(42, 1.2, 0.1, 100);
   camera.position.z = 4.6;
+
+  // prawdziwe oświetlenie — dzięki temu bryła kłódki ma realne cieniowanie
+  // (bez tego płaskie kolory nie czytają się jako 3D, nawet przy obrocie)
+  scene.add(new THREE.AmbientLight(0xffffff, 0.45));
+  var keyLight = new THREE.DirectionalLight(0xffffff, 1.0);
+  keyLight.position.set(2.5, 3, 4);
+  scene.add(keyLight);
+  var rimLight = new THREE.DirectionalLight(0x8b5cf6, 0.5);
+  rimLight.position.set(-3, -1, -2);
+  scene.add(rimLight);
 
   // ---- bariera: czerwona neonowa siatka heksagonalna ----
   function buildHexTexture(){
@@ -1123,10 +1135,13 @@
   barrier.position.x = -0.55;
   scene.add(barrier);
 
-  // ---- kłódka: zielona, z nazwą firmy, na stałe przechylona 30° w lewo ----
+  // ---- kłódka: zielona, z nazwą firmy, na stałe obrócona 30° w bok ----
   var lockColor = 0x2be878;
-  var lockFillMat = new THREE.MeshBasicMaterial({color: lockColor, transparent: true, opacity: 0.22});
-  var lockEdgeMat = new THREE.LineBasicMaterial({color: lockColor});
+  var lockFillMat = new THREE.MeshPhongMaterial({
+    color: lockColor, transparent: true, opacity: 0.68,
+    shininess: 90, specular: 0xbdffe0, side: THREE.DoubleSide
+  });
+  var lockEdgeMat = new THREE.LineBasicMaterial({color: 0xa8ffce});
   var lockGroup = new THREE.Group();
 
   var bodyGeo = new THREE.BoxGeometry(0.9, 0.68, 0.34);
@@ -1163,7 +1178,7 @@
   lockGroup.add(label);
 
   lockGroup.position.x = 0.6;
-  lockGroup.rotation.z = 30 * Math.PI / 180;
+  lockGroup.rotation.y = 30 * Math.PI / 180; // przechylenie W BOK w 3D, nie przekrzywienie w płaszczyźnie
   scene.add(lockGroup);
 
   // ---- pociski: klawisze klawiatury i klucze 3D, lecą w barierę i odbijają się ----
