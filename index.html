@@ -49,6 +49,7 @@
     color-scheme:dark;
   }
   *{box-sizing:border-box;}
+  html{overflow-x:hidden;}
   body{
     background:var(--bg);
     color:var(--text);
@@ -714,6 +715,10 @@
   }
   .copy-btn:hover{color:var(--accent-2);border-color:var(--accent-2);}
   .copy-btn.copied{color:var(--accent-2);border-color:var(--accent-2);}
+  @media (max-width:420px){
+    .contact-field{flex-direction:column;align-items:flex-start;}
+    .contact-field .copy-btn{align-self:stretch;text-align:center;}
+  }
   @media (max-width:640px){
     .contact-grid{grid-template-columns:1fr;}
   }
