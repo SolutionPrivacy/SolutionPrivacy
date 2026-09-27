@@ -1261,14 +1261,8 @@
   wall.position.set(-0.65, 0.15, -0.7);
   scene.add(wall);
 
-  var floorTex = buildGridTexture(); floorTex.repeat.set(5, 6);
-  var floor3d = new THREE.Mesh(
-    new THREE.PlaneGeometry(4.2, 4.6),
-    new THREE.MeshBasicMaterial(Object.assign({map: floorTex}, gridOpts))
-  );
-  floor3d.rotation.x = -Math.PI / 2;
-  floor3d.position.set(-0.2, -1.1, 0.8);
-  scene.add(floor3d);
+  // (podłogę pod kłódką daje teraz wspólne tło całej strony — patrz niżej;
+  // druga, osobna podłoga tutaj tylko robiła bałagan z dwiema siatkami)
 
   // ---- kłódka: zielona, z nazwą firmy i otworem na klucz, obrócona 30° w bok ----
   var lockColor = 0x2be878;
@@ -1287,22 +1281,17 @@
   bezelWire.scale.set(1.1, 1.1, 1.02);
   lockGroup.add(bezelWire);
 
-  // kabłąk OTWARTY (jak na wzorze) — jeden koniec osadzony w korpusie,
-  // drugi odchylony na bok, zamiast symetrycznej zamkniętej pętli
+  // kabłąk — prosta, zamknięta pętla poprawnie osadzona w korpusie
+  // (bezpieczny wybór: wcześniejsza próba "otwartej" pozy wyszła krzywo)
   var shackleGeo = new THREE.TorusGeometry(0.28, 0.05, 8, 24, Math.PI);
-  shackleGeo.translate(-0.28, 0, 0); // jeden koniec pętli w lokalnym (0,0,0)
-  var shackleEdges = new THREE.EdgesGeometry(shackleGeo);
-
-  var shacklePivot = new THREE.Group();
-  shacklePivot.position.set(0.16, 0.4, 0);
-  shacklePivot.rotation.z = 0.85; // odchylenie "otwarte" w bok/do góry
-
-  var shackleMesh = new THREE.Mesh(shackleGeo, lockFillMat);
-  shacklePivot.add(shackleMesh);
-  var shackleWire = new THREE.LineSegments(shackleEdges, lockEdgeMat);
-  shacklePivot.add(shackleWire);
-
-  lockGroup.add(shacklePivot);
+  var shackle = new THREE.Mesh(shackleGeo, lockFillMat);
+  shackle.rotation.z = Math.PI;
+  shackle.position.y = 0.4;
+  lockGroup.add(shackle);
+  var shackleWire = new THREE.LineSegments(new THREE.EdgesGeometry(shackleGeo), lockEdgeMat);
+  shackleWire.rotation.copy(shackle.rotation);
+  shackleWire.position.copy(shackle.position);
+  lockGroup.add(shackleWire);
 
   function buildLabelTexture(){
     var c = document.createElement('canvas');
