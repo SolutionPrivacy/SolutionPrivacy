@@ -1367,8 +1367,9 @@
 </script>
 <script>
 (function(){
-  // Tło CAŁEJ strony w 3D: kolorowy neonowy "pokój" (podłoga + ściana),
-  // stały (fixed), widoczny przez cały czas za treścią, subtelny.
+  // Tło CAŁEJ strony w 3D: kanion serwerowni — ciemne wieże z liniami LED
+  // jak szafy serwerowe, po obu stronach ulicy. Przewijanie strony = jazda
+  // w przód przez miasto, nowe budynki wyłaniają się z przodu.
   if(typeof THREE === 'undefined') return;
   var canvasEl = document.getElementById('bg3d');
   if(!canvasEl) return;
@@ -1379,57 +1380,128 @@
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 
   var scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0x07070f, 12, 78);
   var camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 200);
   camera.position.set(0, 1.4, 4);
-  camera.lookAt(0, -0.3, -10);
+  camera.lookAt(0, -0.2, -10);
 
-  // Siatka w stylu cyberpunk: magenta + cyjan, żółty jako rzadki akcent
-  // (zamiast tęczy) — mocniejsze, bardziej "neon noir".
-  function buildCyberGridTexture(){
+  var TUNNEL_LEN = 92;
+  var STREET_HALF = 3.6;
+  var rackColors = ['#00f0ff', '#00ff9d', '#ff2ec4'];
+
+  // tekstura ściany budynku — jak szafa serwerowa: poziome świecące linie
+  // (jednostki rack) + losowe punkciki jak diody aktywności
+  function buildRackTexture(color){
     var c = document.createElement('canvas');
-    c.width = 256; c.height = 256;
+    c.width = 64; c.height = 256;
     var tctx = c.getContext('2d');
-    var colors = ['#ff2ec4', '#00f0ff', '#ff2ec4', '#00f0ff', '#f4ff2e'];
-    var cell = 32;
-    tctx.lineWidth = 3;
-    var idx = 0;
-    for(var i=0; i<=256; i+=cell){
-      tctx.strokeStyle = colors[idx % colors.length]; idx++;
-      tctx.beginPath(); tctx.moveTo(i,0); tctx.lineTo(i,256); tctx.stroke();
-      tctx.strokeStyle = colors[idx % colors.length]; idx++;
-      tctx.beginPath(); tctx.moveTo(0,i); tctx.lineTo(256,i); tctx.stroke();
+    tctx.fillStyle = '#060810';
+    tctx.fillRect(0, 0, 64, 256);
+    tctx.strokeStyle = color;
+    tctx.shadowColor = color;
+    tctx.shadowBlur = 5;
+    tctx.lineWidth = 2;
+    for(var y = 10; y < 256; y += 16){
+      tctx.beginPath();
+      tctx.moveTo(6, y);
+      tctx.lineTo(58, y);
+      tctx.stroke();
+      if(Math.random() < 0.45){
+        tctx.fillStyle = color;
+        tctx.beginPath();
+        tctx.arc(12, y - 5, 2.2, 0, Math.PI * 2);
+        tctx.fill();
+      }
     }
     var tex = new THREE.CanvasTexture(c);
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
     return tex;
   }
 
-  // podłoga — ciągnie się przez cały "tunel"
-  var floorTex = buildCyberGridTexture();
-  floorTex.repeat.set(14, 46);
-  var floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(50, 140),
-    new THREE.MeshBasicMaterial({map: floorTex, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide})
-  );
-  floor.rotation.x = -Math.PI / 2;
-  floor.position.set(0, -1.6, -34);
-  scene.add(floor);
-
-  // seria świecących "bram" w głębi — kamera przelatuje przez nie kolejno
-  // podczas scrollowania, więc ruch w 3D jest wyraźnie widoczny
-  var gateTex = buildCyberGridTexture();
-  gateTex.repeat.set(6, 4);
-  var gateCount = 7, gateSpacing = 9;
-  var gates = [];
-  for(var gi = 0; gi < gateCount; gi++){
-    var gate = new THREE.Mesh(
-      new THREE.PlaneGeometry(15, 9),
-      new THREE.MeshBasicMaterial({map: gateTex, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide})
-    );
-    gate.position.set(0, 1.4, -6 - gi * gateSpacing);
-    scene.add(gate);
-    gates.push(gate);
+  function makeBuilding(height, width, depth, colorIdx){
+    var color = rackColors[colorIdx % rackColors.length];
+    var tex = buildRackTexture(color);
+    tex.repeat.set(Math.max(1, Math.round(width)), Math.max(2, Math.round(height / 2.5)));
+    var geo = new THREE.BoxGeometry(width, height, depth);
+    var mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({map: tex, fog: true}));
+    mesh.add(new THREE.LineSegments(
+      new THREE.EdgesGeometry(geo),
+      new THREE.LineBasicMaterial({color: color, transparent: true, opacity: 0.5})
+    ));
+    return mesh;
   }
+
+  // budynki — losowo po obu stronach ulicy, na całej długości "podróży"
+  for(var bi = 0; bi < 44; bi++){
+    var side = bi % 2 === 0 ? -1 : 1;
+    var h = 6 + Math.random() * 17;
+    var w = 2.2 + Math.random() * 2.4;
+    var d = 2.2 + Math.random() * 2.4;
+    var building = makeBuilding(h, w, d, bi % 3);
+    var xOff = STREET_HALF + Math.random() * 3.5 + w / 2;
+    building.position.set(side * xOff, h / 2 - 1.6, -6 - Math.random() * TUNNEL_LEN);
+    scene.add(building);
+  }
+
+  // ulica pod nogami
+  var street = new THREE.Mesh(
+    new THREE.PlaneGeometry(STREET_HALF * 2 + 4, TUNNEL_LEN + 20),
+    new THREE.MeshBasicMaterial({color: 0x0a0c14, fog: true})
+  );
+  street.rotation.x = -Math.PI / 2;
+  street.position.set(0, -1.6, -TUNNEL_LEN / 2 - 6);
+  scene.add(street);
+
+  // dwie świecące linie na środku ulicy
+  function buildLineTexture(color){
+    var c = document.createElement('canvas');
+    c.width = 16; c.height = 256;
+    var tctx = c.getContext('2d');
+    tctx.strokeStyle = color;
+    tctx.shadowColor = color;
+    tctx.shadowBlur = 8;
+    tctx.lineWidth = 3;
+    tctx.beginPath();
+    tctx.moveTo(8, 0);
+    tctx.lineTo(8, 256);
+    tctx.stroke();
+    var tex = new THREE.CanvasTexture(c);
+    tex.wrapT = THREE.RepeatWrapping;
+    return tex;
+  }
+  var lineTex = buildLineTexture('#00f0ff');
+  lineTex.repeat.set(1, 20);
+  var lineMat = new THREE.MeshBasicMaterial({
+    map: lineTex, transparent: true, opacity: 0.7,
+    blending: THREE.AdditiveBlending, depthWrite: false, fog: true
+  });
+  [-1, 1].forEach(function(side){
+    var lineMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.2, TUNNEL_LEN + 20), lineMat);
+    lineMesh.rotation.x = -Math.PI / 2;
+    lineMesh.position.set(side * 1.1, -1.58, -TUNNEL_LEN / 2 - 6);
+    scene.add(lineMesh);
+  });
+
+  // blask na horyzoncie, na końcu "kanionu"
+  function buildGlowTexture(color){
+    var c = document.createElement('canvas');
+    c.width = 256; c.height = 256;
+    var gctx = c.getContext('2d');
+    var grad = gctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+    grad.addColorStop(0, color);
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    gctx.fillStyle = grad;
+    gctx.fillRect(0, 0, 256, 256);
+    return new THREE.CanvasTexture(c);
+  }
+  var horizonGlow = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: buildGlowTexture('rgba(0,240,255,0.65)'), transparent: true,
+    depthWrite: false, blending: THREE.AdditiveBlending
+  }));
+  horizonGlow.scale.set(40, 40, 1);
+  horizonGlow.position.set(0, 3, -TUNNEL_LEN - 10);
+  scene.add(horizonGlow);
 
   function resize(){
     var w = window.innerWidth, h = window.innerHeight;
@@ -1440,7 +1512,7 @@
   window.addEventListener('resize', resize);
   resize();
 
-  // przewijanie strony = lot w głąb neonowego tunelu
+  // przewijanie strony = jazda w głąb kanionu serwerowni
   function scrollProgress(){
     var doc = document.documentElement;
     var max = doc.scrollHeight - window.innerHeight;
@@ -1455,10 +1527,10 @@
   }, {passive: true});
 
   var baseX = 0, baseY = 1.4;
-  var lookTarget = new THREE.Vector3(0, -0.3, -10);
+  var lookTarget = new THREE.Vector3(0, -0.2, -10);
 
   function applyCamera(){
-    var targetZ = 4 - scrollProgress() * 70; // od 4 (góra) do -66 (dół) — przelot przez wszystkie bramy
+    var targetZ = 4 - scrollProgress() * 88; // od 4 (góra) do -84 (dół) — przejazd przez całe miasto
     var targetX = baseX + mouseX * 0.6;
     var targetY = baseY - mouseY * 0.3;
     camera.position.z += (targetZ - camera.position.z) * 0.08;
@@ -1468,16 +1540,15 @@
   }
 
   if(reducedMotion){
-    // bez ciągłej animacji, ale scroll (akcja użytkownika) dalej porusza kamerą
     window.addEventListener('scroll', function(){
-      camera.position.z = 4 - scrollProgress() * 70;
+      camera.position.z = 4 - scrollProgress() * 88;
       camera.lookAt(lookTarget);
       renderer.render(scene, camera);
     }, {passive: true});
     renderer.render(scene, camera);
   } else {
     (function animate(){
-      floorTex.offset.y -= 0.0015;
+      lineTex.offset.y -= 0.01; // linie na ulicy "przesuwają się" pod kamerą
       applyCamera();
       renderer.render(scene, camera);
       requestAnimationFrame(animate);
