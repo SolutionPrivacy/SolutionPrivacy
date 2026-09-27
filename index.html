@@ -1524,9 +1524,8 @@
     return group;
   }
 
-  // budynki — rozstawione w slotach po obu stronach ulicy (z jitterem, ale
-  // bez ryzyka, że dwa budynki "zlepią się" w jedną bryłę), więcej na
-  // słabszych telefonach ograniczamy dla płynności
+  // budynki przy ulicy — rozstawione w slotach po obu stronach (z jitterem,
+  // ale bez ryzyka, że dwa budynki "zlepią się" w jedną bryłę)
   var BUILDING_TOTAL = lowPower ? 26 : 48;
   var perSide = Math.ceil(BUILDING_TOTAL / 2);
   var slotLen = TUNNEL_LEN / perSide;
@@ -1544,6 +1543,22 @@
       scene.add(building);
     }
   });
+
+  // druga "warstwa" — dalsza panorama miasta, dużo szerzej rozstawiona,
+  // żeby wypełnić puste pole po bokach kadru zamiast gołej podłogi/mgły
+  var SKYLINE_TOTAL = lowPower ? 20 : 44;
+  for(var sk = 0; sk < SKYLINE_TOTAL; sk++){
+    var skSide = sk % 2 === 0 ? -1 : 1;
+    var skH = 9 + Math.random() * 34;
+    var skW = 3 + Math.random() * 5;
+    var skD = 3 + Math.random() * 5;
+    var skColor = palette[Math.floor(Math.random() * palette.length)];
+    var skBuilding = makeBuilding(skH, skW, skD, skColor);
+    var skZ = -8 - Math.random() * (TUNNEL_LEN + 10);
+    var skX = STREET_HALF + 6 + Math.random() * 26 + skW / 2;
+    skBuilding.position.set(skSide * skX, FLOOR_Y - 0.06, skZ);
+    scene.add(skBuilding);
+  }
 
   // lśniąca podłoga z płytek + smugi połysku (jak mokra, glazurowana ulica)
   function buildFloorTexture(){
