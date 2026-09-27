@@ -989,7 +989,8 @@
           alpha: rand(def.alphaMin, def.alphaMax),
           color: rainPalette[Math.floor(Math.random()*rainPalette.length)],
           ch: glyphs[Math.floor(Math.random()*glyphs.length)],
-          swap: rand(6, 24)
+          swap: rand(6, 24),
+          hit: false
         });
       }
       return cols;
@@ -1006,11 +1007,51 @@
     buildColumns();
   }
 
+  // Litery rozbijają się o "podłogę" na dole strony zamiast po prostu
+  // znikać — mały wybuch odłamków-znaków przy uderzeniu.
+  var shatterParticles = [];
+  function spawnShatter(x, y, color){
+    var n = 4 + Math.floor(Math.random() * 3);
+    for(var i = 0; i < n; i++){
+      shatterParticles.push({
+        x: x, y: y,
+        vx: (Math.random() - 0.5) * 2.6,
+        vy: -Math.random() * 1.7 - 0.3,
+        life: 0,
+        maxLife: 24 + Math.random() * 16,
+        color: color,
+        ch: glyphs[Math.floor(Math.random() * glyphs.length)]
+      });
+    }
+  }
+  function updateShatter(){
+    ctx.font = '11px "IBM Plex Mono", monospace';
+    ctx.textBaseline = 'middle';
+    for(var i = shatterParticles.length - 1; i >= 0; i--){
+      var p = shatterParticles[i];
+      p.vy += 0.09;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.life++;
+      var a = Math.max(0, 1 - p.life / p.maxLife);
+      ctx.fillStyle = 'rgba(' + p.color + ',' + (a * 0.9) + ')';
+      ctx.fillText(p.ch, p.x, p.y);
+      if(p.life > p.maxLife) shatterParticles.splice(i, 1);
+    }
+  }
+
   var frame = 0;
   function draw(){
     var cw = w/dpr, ch2 = h/dpr;
     ctx.fillStyle = 'rgba(7,7,15,0.16)';
     ctx.fillRect(0,0,cw,ch2);
+
+    // poświata "gorącej podłogi" tam, gdzie litery się rozbijają
+    var floorGlow = ctx.createLinearGradient(0, ch2-46, 0, ch2);
+    floorGlow.addColorStop(0, 'rgba(255,50,80,0)');
+    floorGlow.addColorStop(1, 'rgba(255,50,80,0.10)');
+    ctx.fillStyle = floorGlow;
+    ctx.fillRect(0, ch2-46, cw, 46);
 
     layerDefs.forEach(function(def, li){
       ctx.font = def.fontSize + 'px "IBM Plex Mono", monospace';
@@ -1027,16 +1068,22 @@
           col.ch = glyphs[Math.floor(Math.random()*glyphs.length)];
           col.swap = rand(6,24);
         }
+        if(!col.hit && col.y > ch2 - def.fontSize*0.5){
+          col.hit = true;
+          spawnShatter(col.x, ch2 - 2, col.color);
+        }
         if(col.y > ch2 + def.fontSize){
           col.y = rand(-400, -def.fontSize);
           col.x = rand(0, cw);
           col.speed = rand(def.speedMin, def.speedMax);
           col.color = rainPalette[Math.floor(Math.random()*rainPalette.length)];
+          col.hit = false;
         }
       });
     });
 
     ctx.shadowBlur = 0;
+    updateShatter();
     frame = requestAnimationFrame(draw);
   }
 
@@ -1084,7 +1131,8 @@
 
   var scene = new THREE.Scene();
   var camera = new THREE.PerspectiveCamera(42, 1.2, 0.1, 100);
-  camera.position.z = 4.6;
+  camera.position.set(0, 0.35, 5.4);
+  camera.lookAt(0, -0.1, 0);
 
   // prawdziwe oświetlenie — dzięki temu bryła kłódki ma realne cieniowanie
   // (bez tego płaskie kolory nie czytają się jako 3D, nawet przy obrocie)
@@ -1096,62 +1144,60 @@
   rimLight.position.set(-3, -1, -2);
   scene.add(rimLight);
 
-  // ---- bariera: czerwona neonowa siatka heksagonalna ----
-  function buildHexTexture(){
+  // ---- pomieszczenie: podłoga + ściana z czerwonej neonowej siatki ----
+  // (prawdziwa geometria 3D pod kątem, nie płaska tekstura na wprost
+  // kamery — dzięki temu widać głębię, a nie "coś jakby od tyłu")
+  function buildGridTexture(){
     var c = document.createElement('canvas');
     c.width = 256; c.height = 256;
     var tctx = c.getContext('2d');
     tctx.strokeStyle = 'rgba(255,45,70,0.95)';
-    tctx.lineWidth = 2.5;
-    var r = 20;
-    function hex(cx, cy){
-      tctx.beginPath();
-      for(var i=0; i<6; i++){
-        var ang = Math.PI/3*i - Math.PI/6;
-        var x = cx + r*Math.cos(ang), y = cy + r*Math.sin(ang);
-        if(i===0) tctx.moveTo(x,y); else tctx.lineTo(x,y);
-      }
-      tctx.closePath();
-      tctx.stroke();
-    }
-    var stepX = r*1.73, stepY = r*1.5;
-    for(var row=-1; row<10; row++){
-      for(var col=-1; col<10; col++){
-        var cx = col*stepX + (row%2 ? stepX/2 : 0);
-        var cy = row*stepY;
-        hex(cx, cy);
-      }
+    tctx.lineWidth = 3;
+    var cell = 32;
+    for(var i=0; i<=256; i+=cell){
+      tctx.beginPath(); tctx.moveTo(i,0); tctx.lineTo(i,256); tctx.stroke();
+      tctx.beginPath(); tctx.moveTo(0,i); tctx.lineTo(256,i); tctx.stroke();
     }
     var tex = new THREE.CanvasTexture(c);
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(2.2, 2.4);
     return tex;
   }
-  var barrierMat = new THREE.MeshBasicMaterial({
-    map: buildHexTexture(), transparent: true, opacity: 0.85,
-    side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false
-  });
-  var barrier = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.9), barrierMat);
-  barrier.position.x = -0.55;
-  scene.add(barrier);
+  var gridOpts = {transparent: true, opacity: 0.8, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false};
 
-  // ---- kłódka: zielona, z nazwą firmy, na stałe obrócona 30° w bok ----
+  var wallTex = buildGridTexture(); wallTex.repeat.set(4, 3);
+  var wall = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.6, 2.1),
+    new THREE.MeshBasicMaterial(Object.assign({map: wallTex}, gridOpts))
+  );
+  wall.position.set(-0.65, 0.15, -0.7);
+  scene.add(wall);
+
+  var floorTex = buildGridTexture(); floorTex.repeat.set(5, 6);
+  var floor3d = new THREE.Mesh(
+    new THREE.PlaneGeometry(4.2, 4.6),
+    new THREE.MeshBasicMaterial(Object.assign({map: floorTex}, gridOpts))
+  );
+  floor3d.rotation.x = -Math.PI / 2;
+  floor3d.position.set(-0.2, -1.1, 0.8);
+  scene.add(floor3d);
+
+  // ---- kłódka: zielona, z nazwą firmy i otworem na klucz, obrócona 30° w bok ----
   var lockColor = 0x2be878;
   var lockFillMat = new THREE.MeshPhongMaterial({
-    color: lockColor, transparent: true, opacity: 0.68,
+    color: lockColor, transparent: true, opacity: 0.72,
     shininess: 90, specular: 0xbdffe0, side: THREE.DoubleSide
   });
   var lockEdgeMat = new THREE.LineBasicMaterial({color: 0xa8ffce});
   var lockGroup = new THREE.Group();
 
-  var bodyGeo = new THREE.BoxGeometry(0.9, 0.68, 0.34);
+  var bodyGeo = new THREE.BoxGeometry(0.86, 0.8, 0.36);
   lockGroup.add(new THREE.Mesh(bodyGeo, lockFillMat));
   lockGroup.add(new THREE.LineSegments(new THREE.EdgesGeometry(bodyGeo), lockEdgeMat));
 
-  var shackleGeo = new THREE.TorusGeometry(0.32, 0.06, 8, 24, Math.PI);
+  var shackleGeo = new THREE.TorusGeometry(0.29, 0.05, 8, 24, Math.PI);
   var shackle = new THREE.Mesh(shackleGeo, lockFillMat);
   shackle.rotation.z = Math.PI;
-  shackle.position.y = 0.34;
+  shackle.position.y = 0.4;
   lockGroup.add(shackle);
   var shackleWire = new THREE.LineSegments(new THREE.EdgesGeometry(shackleGeo), lockEdgeMat);
   shackleWire.rotation.copy(shackle.rotation);
@@ -1165,20 +1211,46 @@
     tctx.fillStyle = 'rgba(235,255,244,0.95)';
     tctx.textAlign = 'center';
     tctx.textBaseline = 'middle';
-    tctx.font = '700 56px "IBM Plex Mono", monospace';
-    tctx.fillText('SOLUTION', 256, 96);
-    tctx.fillText('PRIVACY', 256, 168);
+    tctx.font = '700 64px "IBM Plex Mono", monospace';
+    tctx.fillText('SOLUTION', 256, 90);
+    tctx.fillText('PRIVACY', 256, 172);
     return new THREE.CanvasTexture(c);
   }
   var label = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.82, 0.41),
+    new THREE.PlaneGeometry(0.72, 0.36),
     new THREE.MeshBasicMaterial({map: buildLabelTexture(), transparent: true})
   );
-  label.position.z = 0.18;
+  label.position.set(0, 0.15, 0.185);
   lockGroup.add(label);
 
-  lockGroup.position.x = 0.6;
+  // otwór na klucz — wyraźny szczegół, żeby bryła czytała się jako kłódka
+  function buildKeyholeTexture(){
+    var c = document.createElement('canvas');
+    c.width = 128; c.height = 128;
+    var tctx = c.getContext('2d');
+    tctx.fillStyle = 'rgba(6,20,14,0.92)';
+    tctx.beginPath();
+    tctx.arc(64, 42, 19, 0, Math.PI * 2);
+    tctx.fill();
+    tctx.beginPath();
+    tctx.moveTo(51, 54);
+    tctx.lineTo(77, 54);
+    tctx.lineTo(69, 92);
+    tctx.lineTo(59, 92);
+    tctx.closePath();
+    tctx.fill();
+    return new THREE.CanvasTexture(c);
+  }
+  var keyhole = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.2, 0.2),
+    new THREE.MeshBasicMaterial({map: buildKeyholeTexture(), transparent: true})
+  );
+  keyhole.position.set(0, -0.2, 0.185);
+  lockGroup.add(keyhole);
+
+  lockGroup.position.x = 0.65;
   lockGroup.rotation.y = 30 * Math.PI / 180; // przechylenie W BOK w 3D, nie przekrzywienie w płaszczyźnie
+  lockGroup.scale.setScalar(1.4);
   scene.add(lockGroup);
 
   // ---- pociski: klawisze klawiatury i klucze 3D, lecą w barierę i odbijają się ----
@@ -1207,7 +1279,7 @@
   }
 
   var projectiles = [];
-  var barrierFaceX = barrier.position.x + 0.08;
+  var barrierFaceX = wall.position.x + 0.15;
   function spawnProjectile(){
     var obj = Math.random() < 0.5 ? makeKeycap() : makeKey3D();
     obj.position.set(-2.6, (Math.random()-0.5)*0.9, (Math.random()-0.5)*0.4);
