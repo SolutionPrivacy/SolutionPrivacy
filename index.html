@@ -206,6 +206,17 @@
     align-items:center;
     gap:28px;
   }
+  /* wygaszenie tła 3D tuż przed rozdzielaczem sekcji, żeby żaden jaśniejszy
+     fragment sceny (budynek, smuga deszczu) nie "wystawał" ukośnie poza
+     wąski pasek rozdzielacza, tylko płynnie gasł do koloru tła */
+  .hero::after{
+    content:'';
+    position:absolute;
+    left:0;right:0;bottom:0;
+    height:70px;
+    background:linear-gradient(180deg, transparent, var(--bg));
+    pointer-events:none;
+  }
   .hero-copy{perspective:900px;}
   .hero-title{
     grid-column:1/-1;
@@ -808,11 +819,14 @@
     right:18px;
     z-index:5;
     opacity:0;
-    transform:translateY(12px);
+    transform:translateY(30px) scale(.85);
     pointer-events:none;
-    transition:opacity .3s ease, transform .3s ease;
+    transition:opacity .4s ease, transform .5s cubic-bezier(.22,.85,.3,1.4);
   }
-  .sticky-cta.is-visible{opacity:1;transform:translateY(0);pointer-events:auto;}
+  .sticky-cta.is-visible{opacity:1;transform:translateY(0) scale(1);pointer-events:auto;}
+  @media (prefers-reduced-motion: reduce){
+    .sticky-cta{transition:opacity .2s ease;}
+  }
   @media (max-width:640px){
     .sticky-cta{left:18px;right:18px;bottom:14px;}
     .sticky-cta .btn{width:100%;justify-content:center;}
@@ -826,6 +840,10 @@
     font-family:var(--mono);
     font-size:11.5px;
     color:var(--text-dim);
+  }
+  @media (max-width:640px){
+    /* miejsce na sticky CTA, żeby nie zasłaniał danych firmy na dole */
+    footer{padding-bottom:96px;}
   }
   .footer-row{
     display:flex;
@@ -1305,8 +1323,28 @@
     }
   }
 
+  // Ten canvas jest teraz widoczny tylko w hero i na rozdzielaczach sekcji
+  // (reszta strony ma nieprzezroczyste tło) — więc poza tymi miejscami
+  // rysowanie każdej klatki (znaki, poświaty, cząstki) jest zmarnowaną
+  // pracą CPU. Wstrzymujemy ją, gdy nic z tego i tak nie jest widoczne.
+  var canvasVisible = true;
+  if('IntersectionObserver' in window){
+    var visibleCanvasEls = new Set();
+    var canvasIo = new IntersectionObserver(function(entries){
+      entries.forEach(function(entry){
+        if(entry.isIntersecting){ visibleCanvasEls.add(entry.target); }
+        else{ visibleCanvasEls.delete(entry.target); }
+      });
+      canvasVisible = visibleCanvasEls.size > 0;
+    }, {threshold: 0});
+    var heroForCanvas = document.querySelector('.hero');
+    if(heroForCanvas) canvasIo.observe(heroForCanvas);
+    document.querySelectorAll('.section-divider').forEach(function(el){ canvasIo.observe(el); });
+  }
+
   var frame = 0;
   function draw(){
+    if(!canvasVisible){ frame = requestAnimationFrame(draw); return; }
     var cw = w/dpr, ch2 = h/dpr;
     ctx.fillStyle = 'rgba(7,7,15,0.16)';
     ctx.fillRect(0,0,cw,ch2);
@@ -1374,11 +1412,6 @@
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
-<script>
-  if(typeof THREE === 'undefined'){
-    document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/128/three.min.js"><\/script>');
-  }
-</script>
 <script>
 (function(){
   // Tło CAŁEJ strony w 3D: mroczny kanion serwerowni z poziomu ulicy.
@@ -1728,6 +1761,26 @@
   window.addEventListener('resize', resize);
   resize();
 
+  // Tło jest teraz widoczne tylko w hero i na cienkich rozdzielaczach sekcji
+  // (reszta strony ma nieprzezroczyste tło) — więc gdy żaden z tych
+  // fragmentów nie jest w widoku, cała scena jest i tak niewidoczna.
+  // Nie ma sensu jej wtedy renderować — oszczędza to realny czas CPU/GPU
+  // podczas przewijania długich sekcji treści.
+  var bgVisible = true;
+  if('IntersectionObserver' in window){
+    var visibleEls = new Set();
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(entry){
+        if(entry.isIntersecting){ visibleEls.add(entry.target); }
+        else{ visibleEls.delete(entry.target); }
+      });
+      bgVisible = visibleEls.size > 0;
+    }, {threshold: 0});
+    var heroEl = document.querySelector('.hero');
+    if(heroEl) io.observe(heroEl);
+    document.querySelectorAll('.section-divider').forEach(function(el){ io.observe(el); });
+  }
+
   // przewijanie strony = jazda w głąb kanionu serwerowni — jedyny ruch kamery
   function scrollProgress(){
     var doc = document.documentElement;
@@ -1739,6 +1792,7 @@
   var TRAVEL = TUNNEL_LEN - 8; // cały przejazd kończy się dokładnie na końcu kanionu
 
   function render(dt){
+    if(!bgVisible) return;
     var t = performance.now() / 1000;
     finalePlane.position.y = 0.5 + Math.sin(t * 0.7) * 0.25;
     finalePlane.rotation.y = Math.sin(t * 0.4) * 0.25;
