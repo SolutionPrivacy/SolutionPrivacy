@@ -1205,9 +1205,8 @@
 
 <script>
 (function(){
-  // Scena "prywatność": zielona kłódka z nazwą firmy, naprzeciw niej
-  // czerwona neonowa siatka (firewall/pole siłowe) — klawisze i klucze
-  // 3D lecą w barierę i odbijają się, nigdy jej nie przechodząc.
+  // Sama kłódka. Nic więcej — bez ściany, bez pocisków. Niebieski neon,
+  // dokładnie jak na przesłanym wzorze, kołysząca się łagodnie góra-dół.
   if(typeof THREE === 'undefined') return;
   var canvasEl = document.getElementById('logo3d');
   var wrap = canvasEl ? canvasEl.parentElement : null;
@@ -1220,89 +1219,33 @@
 
   var scene = new THREE.Scene();
   var camera = new THREE.PerspectiveCamera(42, 1.2, 0.1, 100);
-  camera.position.set(0, 0.05, 5.2);
+  camera.position.set(0, 0, 4.6);
   camera.lookAt(0, 0, 0);
 
-  // prawdziwe oświetlenie — dzięki temu bryła kłódki ma realne cieniowanie
-  // (bez tego płaskie kolory nie czytają się jako 3D, nawet przy obrocie)
-  scene.add(new THREE.AmbientLight(0xffffff, 0.45));
-  var keyLight = new THREE.DirectionalLight(0xffffff, 1.0);
-  keyLight.position.set(2.5, 3, 4);
-  scene.add(keyLight);
-  var rimLight = new THREE.DirectionalLight(0x8b5cf6, 0.5);
-  rimLight.position.set(-3, -1, -2);
-  scene.add(rimLight);
-
-  // ---- ściana: prawdziwe świecące RURKI 3D (jak klingi świetlnego miecza),
-  // nie płaska tekstura z liniami — siatka złożona z cylindrów.
-  function buildNeonTubeGrid(width, height, spacing, color){
-    var group = new THREE.Group();
-    var coreMat = new THREE.MeshBasicMaterial({color: color});
-    var glowMat = new THREE.MeshBasicMaterial({
-      color: color, transparent: true, opacity: 0.28,
-      blending: THREE.AdditiveBlending, depthWrite: false
-    });
-    var coreR = 0.017, glowR = 0.05;
-    var cols = Math.round(width / spacing), rows = Math.round(height / spacing);
-
-    for(var i = 0; i <= cols; i++){
-      var x = -width/2 + i*spacing;
-      var core = new THREE.Mesh(new THREE.CylinderGeometry(coreR, coreR, height, 8), coreMat);
-      core.position.x = x;
-      group.add(core);
-      var glow = new THREE.Mesh(new THREE.CylinderGeometry(glowR, glowR, height, 8), glowMat);
-      glow.position.x = x;
-      group.add(glow);
-    }
-    for(var j = 0; j <= rows; j++){
-      var y = -height/2 + j*spacing;
-      var coreH = new THREE.Mesh(new THREE.CylinderGeometry(coreR, coreR, width, 8), coreMat);
-      coreH.rotation.z = Math.PI / 2;
-      coreH.position.y = y;
-      group.add(coreH);
-      var glowH = new THREE.Mesh(new THREE.CylinderGeometry(glowR, glowR, width, 8), glowMat);
-      glowH.rotation.z = Math.PI / 2;
-      glowH.position.y = y;
-      group.add(glowH);
-    }
-    return group;
-  }
-
-  var wall = buildNeonTubeGrid(2.6, 2.1, 0.34, 0xff1440);
-  wall.position.set(-0.65, 0.15, -0.7);
-  scene.add(wall);
-
-  // (podłogę pod kłódką daje teraz wspólne tło całej strony — patrz niżej;
-  // druga, osobna podłoga tutaj tylko robiła bałagan z dwiema siatkami)
-
-  // ---- kłódka: gotowa grafika 2D (w pełni kontrolowana) na płaszczyźnie 3D,
-  // zamiast budowania kształtu z osobnych brył — bezpieczniejsze i wierniejsze
-  // wzorowi niż poprzednie próby z geometrią. Własny rysunek w tym samym
-  // stylu (nie mogę użyć przesłanego pliku — to zdjęcie stockowe ze
-  // znakiem wodnym Alamy, bez licencji do użycia na stronie klienta).
+  // kłódka narysowana jako czysta grafika 2D (pełna kontrola nad kształtem),
+  // nałożona na płaszczyznę w 3D — niebieski neon jak na wzorze
   function buildPadlockTexture(){
     var c = document.createElement('canvas');
-    c.width = 420; c.height = 580;
+    c.width = 420; c.height = 460;
     var tctx = c.getContext('2d');
-    var neon = '#39ff8a';
+    var neon = '#4fd8ff';
     tctx.lineCap = 'round';
     tctx.lineJoin = 'round';
-
-    // kabłąk — pełna, ZAMKNIĘTA pętla (prosty, niezawodny kształt zamiast
-    // wcześniejszego "otwartego" łuku, który renderował się źle u góry)
     tctx.strokeStyle = neon;
     tctx.shadowColor = neon;
-    var scx = 210, scy = 140, sr = 78;
+
+    // kabłąk — pełna, zamknięta pętla
+    var scx = 210, scy = 130, sr = 78;
     tctx.lineWidth = 17;
-    tctx.shadowBlur = 22;
+    tctx.shadowBlur = 24;
     tctx.beginPath();
     tctx.arc(scx, scy, sr, Math.PI, Math.PI * 2, false);
     tctx.stroke();
 
     // korpus — zaokrąglony prostokąt
-    var bx = 108, by = 198, bw = 204, bh = 186, br = 24;
+    var bx = 108, by = 188, bw = 204, bh = 186, br = 24;
     tctx.lineWidth = 13;
-    tctx.shadowBlur = 18;
+    tctx.shadowBlur = 20;
     tctx.beginPath();
     tctx.moveTo(bx + br, by);
     tctx.lineTo(bx + bw - br, by);
@@ -1316,108 +1259,28 @@
     tctx.closePath();
     tctx.stroke();
 
-    // otwór na klucz
-    tctx.shadowBlur = 8;
-    tctx.fillStyle = 'rgba(4,16,10,0.95)';
+    // otwór na klucz — kontur, jak reszta ikony (nie wypełniony kształt)
+    tctx.lineWidth = 9;
+    tctx.shadowBlur = 12;
     tctx.beginPath();
-    tctx.arc(bx + bw / 2, by + 78, 17, 0, Math.PI * 2);
-    tctx.fill();
+    tctx.arc(bx + bw / 2, by + 78, 15, 0, Math.PI * 2);
+    tctx.stroke();
     tctx.beginPath();
-    tctx.moveTo(bx + bw / 2 - 11, by + 90);
-    tctx.lineTo(bx + bw / 2 + 11, by + 90);
-    tctx.lineTo(bx + bw / 2 + 6, by + 130);
-    tctx.lineTo(bx + bw / 2 - 6, by + 130);
+    tctx.moveTo(bx + bw / 2 - 10, by + 88);
+    tctx.lineTo(bx + bw / 2 + 10, by + 88);
+    tctx.lineTo(bx + bw / 2 + 5, by + 126);
+    tctx.lineTo(bx + bw / 2 - 5, by + 126);
     tctx.closePath();
-    tctx.fill();
-
-    // napis — pod kłódką, różowy neon (jak na wzorze)
-    var pink = '#ff4fc3';
-    tctx.shadowColor = pink;
-    tctx.shadowBlur = 14;
-    tctx.fillStyle = pink;
-    tctx.textAlign = 'center';
-    tctx.textBaseline = 'middle';
-    tctx.font = '700 36px "IBM Plex Mono", monospace';
-    tctx.fillText('SOLUTION', 210, 470);
-    tctx.fillText('PRIVACY', 210, 516);
+    tctx.stroke();
 
     return new THREE.CanvasTexture(c);
   }
 
-  var lockGroup = new THREE.Group();
   var lockPlane = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.3, 1.3 * (580 / 420)),
+    new THREE.PlaneGeometry(1.5, 1.5 * (460 / 420)),
     new THREE.MeshBasicMaterial({map: buildPadlockTexture(), transparent: true, side: THREE.DoubleSide})
   );
-  lockGroup.add(lockPlane);
-
-  lockGroup.position.x = 0.65; // po prawej, za ścianą, przodem do widza (bez przechyłu)
-  scene.add(lockGroup);
-
-  // ---- pociski: klawisze klawiatury i klucze 3D, lecą w barierę i odbijają się ----
-  var keycapMat = new THREE.MeshBasicMaterial({color: 0xdadde6, transparent: true, opacity: 0.9});
-  var keycapEdgeMat = new THREE.LineBasicMaterial({color: 0xffffff, transparent: true, opacity: 0.9});
-  function makeKeycap(){
-    var g = new THREE.Group();
-    var geo = new THREE.BoxGeometry(0.17, 0.17, 0.08);
-    g.add(new THREE.Mesh(geo, keycapMat.clone()));
-    g.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo), keycapEdgeMat.clone()));
-    return g;
-  }
-  function makeKey3D(){
-    var mat = new THREE.MeshBasicMaterial({color: 0xf5c542, transparent: true, opacity: 0.95});
-    var g = new THREE.Group();
-    g.add(new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.025, 8, 16), mat));
-    var shaft = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.035, 0.035), mat);
-    shaft.position.x = 0.17;
-    g.add(shaft);
-    var t1 = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.06, 0.035), mat);
-    t1.position.set(0.24, -0.035, 0);
-    var t2 = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.08, 0.035), mat);
-    t2.position.set(0.31, -0.045, 0);
-    g.add(t1, t2);
-    return g;
-  }
-
-  var projectiles = [];
-  var barrierFaceX = wall.position.x + 0.15;
-  function spawnProjectile(){
-    var obj = Math.random() < 0.5 ? makeKeycap() : makeKey3D();
-    obj.position.set(-2.6, (Math.random()-0.5)*0.9, (Math.random()-0.5)*0.4);
-    obj.userData = {vx: 0.026 + Math.random()*0.012, bounced: false, life: 0};
-    scene.add(obj);
-    projectiles.push(obj);
-  }
-  function fadeGroup(g, amount){
-    g.children.forEach(function(c){
-      if(c.material){ c.material.opacity = Math.max(0, (c.material.opacity) - amount); }
-    });
-  }
-  function updateProjectiles(spawning){
-    if(spawning){
-      updateProjectiles.timer = (updateProjectiles.timer || 0) - 1;
-      if(updateProjectiles.timer <= 0){
-        spawnProjectile();
-        updateProjectiles.timer = 170 + Math.random()*170; // ~3-6s @60fps
-      }
-    }
-    for(var i = projectiles.length - 1; i >= 0; i--){
-      var p = projectiles[i], d = p.userData;
-      d.life++;
-      p.rotation.x += 0.045;
-      p.rotation.y += 0.06;
-      p.position.x += d.vx;
-      if(!d.bounced && p.position.x >= barrierFaceX){
-        d.bounced = true;
-        d.vx = -Math.abs(d.vx) * 0.55;
-      }
-      if(d.bounced){ fadeGroup(p, 0.018); }
-      if(d.life > 260 || (d.bounced && d.life > 140)){
-        scene.remove(p);
-        projectiles.splice(i, 1);
-      }
-    }
-  }
+  scene.add(lockPlane);
 
   function resize(){
     var w = wrap.clientWidth || 1;
@@ -1430,11 +1293,12 @@
   resize();
 
   if(reducedMotion){
-    // bez lecących pocisków — statyczna, czytelna kompozycja
     renderer.render(scene, camera);
   } else {
+    var t = 0;
     (function animate(){
-      updateProjectiles(true);
+      t += 0.022;
+      lockPlane.position.y = Math.sin(t) * 0.16; // kołysanie góra-dół
       renderer.render(scene, camera);
       requestAnimationFrame(animate);
     })();
