@@ -1526,7 +1526,7 @@
 
   // budynki przy ulicy — rozstawione w slotach po obu stronach (z jitterem,
   // ale bez ryzyka, że dwa budynki "zlepią się" w jedną bryłę)
-  var BUILDING_TOTAL = lowPower ? 26 : 48;
+  var BUILDING_TOTAL = lowPower ? 18 : 34;
   var perSide = Math.ceil(BUILDING_TOTAL / 2);
   var slotLen = TUNNEL_LEN / perSide;
   [-1, 1].forEach(function(side){
@@ -1546,7 +1546,7 @@
 
   // druga "warstwa" — dalsza panorama miasta, dużo szerzej rozstawiona,
   // żeby wypełnić puste pole po bokach kadru zamiast gołej podłogi/mgły
-  var SKYLINE_TOTAL = lowPower ? 20 : 44;
+  var SKYLINE_TOTAL = lowPower ? 14 : 31;
   for(var sk = 0; sk < SKYLINE_TOTAL; sk++){
     var skSide = sk % 2 === 0 ? -1 : 1;
     var skH = 9 + Math.random() * 34;
