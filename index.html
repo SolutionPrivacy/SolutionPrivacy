@@ -60,11 +60,22 @@
   #matrix-canvas{
     position:fixed;
     inset:0;
-    z-index:-4;
+    z-index:-5;
     display:block;
     width:100%;
     height:100%;
     background:var(--bg);
+  }
+  /* Tło strony w 3D: kolorowy neonowy pokój (podłoga + ściana), widoczny
+     przez cały czas za treścią, subtelny żeby nie zabijać czytelności. */
+  #bg3d{
+    position:fixed;
+    inset:0;
+    z-index:-4;
+    display:block;
+    width:100%;
+    height:100%;
+    pointer-events:none;
   }
   .bg-field{
     position:fixed;
@@ -687,6 +698,7 @@
 <body>
 
 <canvas id="matrix-canvas"></canvas>
+<canvas id="bg3d" aria-hidden="true"></canvas>
 <div class="bg-field"></div>
 <div class="vignette"></div>
 <div class="scanlines"></div>
@@ -1116,6 +1128,83 @@
 </script>
 <script>
 (function(){
+  // Tło CAŁEJ strony w 3D: kolorowy neonowy "pokój" (podłoga + ściana),
+  // stały (fixed), widoczny przez cały czas za treścią, subtelny.
+  if(typeof THREE === 'undefined') return;
+  var canvasEl = document.getElementById('bg3d');
+  if(!canvasEl) return;
+
+  var reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var renderer = new THREE.WebGLRenderer({canvas: canvasEl, alpha: true, antialias: true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+  var scene = new THREE.Scene();
+  var camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 200);
+  camera.position.set(0, 1.4, 4);
+  camera.lookAt(0, -0.3, -10);
+
+  function buildRainbowGridTexture(){
+    var c = document.createElement('canvas');
+    c.width = 256; c.height = 256;
+    var tctx = c.getContext('2d');
+    var colors = ['#ff2d6e','#ff9d2d','#e6ff2d','#2dff6e','#2de6ff','#6e2dff','#ff2de6'];
+    var cell = 32;
+    tctx.lineWidth = 3;
+    var idx = 0;
+    for(var i=0; i<=256; i+=cell){
+      tctx.strokeStyle = colors[idx % colors.length]; idx++;
+      tctx.beginPath(); tctx.moveTo(i,0); tctx.lineTo(i,256); tctx.stroke();
+      tctx.strokeStyle = colors[idx % colors.length]; idx++;
+      tctx.beginPath(); tctx.moveTo(0,i); tctx.lineTo(256,i); tctx.stroke();
+    }
+    var tex = new THREE.CanvasTexture(c);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    return tex;
+  }
+
+  var floorTex = buildRainbowGridTexture();
+  floorTex.repeat.set(14, 30);
+  var floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(50, 100),
+    new THREE.MeshBasicMaterial({map: floorTex, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide})
+  );
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.set(0, -1.6, -20);
+  scene.add(floor);
+
+  var wallTex = buildRainbowGridTexture();
+  wallTex.repeat.set(14, 8);
+  var wall = new THREE.Mesh(
+    new THREE.PlaneGeometry(50, 26),
+    new THREE.MeshBasicMaterial({map: wallTex, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide})
+  );
+  wall.position.set(0, 6, -45);
+  scene.add(wall);
+
+  function resize(){
+    var w = window.innerWidth, h = window.innerHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  if(reducedMotion){
+    renderer.render(scene, camera);
+  } else {
+    (function animate(){
+      floorTex.offset.y -= 0.0015;
+      renderer.render(scene, camera);
+      requestAnimationFrame(animate);
+    })();
+  }
+})();
+</script>
+
+<script>
+(function(){
   // Scena "prywatność": zielona kłódka z nazwą firmy, naprzeciw niej
   // czerwona neonowa siatka (firewall/pole siłowe) — klawisze i klucze
   // 3D lecą w barierę i odbijają się, nigdy jej nie przechodząc.
@@ -1193,16 +1282,27 @@
   var bodyGeo = new THREE.BoxGeometry(0.86, 0.8, 0.36);
   lockGroup.add(new THREE.Mesh(bodyGeo, lockFillMat));
   lockGroup.add(new THREE.LineSegments(new THREE.EdgesGeometry(bodyGeo), lockEdgeMat));
+  // druga, lekko większa ramka — efekt podwójnego obrysu/faski jak na wzorze
+  var bezelWire = new THREE.LineSegments(new THREE.EdgesGeometry(bodyGeo), new THREE.LineBasicMaterial({color: 0xa8ffce, transparent: true, opacity: 0.35}));
+  bezelWire.scale.set(1.1, 1.1, 1.02);
+  lockGroup.add(bezelWire);
 
-  var shackleGeo = new THREE.TorusGeometry(0.29, 0.05, 8, 24, Math.PI);
-  var shackle = new THREE.Mesh(shackleGeo, lockFillMat);
-  shackle.rotation.z = Math.PI;
-  shackle.position.y = 0.4;
-  lockGroup.add(shackle);
-  var shackleWire = new THREE.LineSegments(new THREE.EdgesGeometry(shackleGeo), lockEdgeMat);
-  shackleWire.rotation.copy(shackle.rotation);
-  shackleWire.position.copy(shackle.position);
-  lockGroup.add(shackleWire);
+  // kabłąk OTWARTY (jak na wzorze) — jeden koniec osadzony w korpusie,
+  // drugi odchylony na bok, zamiast symetrycznej zamkniętej pętli
+  var shackleGeo = new THREE.TorusGeometry(0.28, 0.05, 8, 24, Math.PI);
+  shackleGeo.translate(-0.28, 0, 0); // jeden koniec pętli w lokalnym (0,0,0)
+  var shackleEdges = new THREE.EdgesGeometry(shackleGeo);
+
+  var shacklePivot = new THREE.Group();
+  shacklePivot.position.set(0.16, 0.4, 0);
+  shacklePivot.rotation.z = 0.85; // odchylenie "otwarte" w bok/do góry
+
+  var shackleMesh = new THREE.Mesh(shackleGeo, lockFillMat);
+  shacklePivot.add(shackleMesh);
+  var shackleWire = new THREE.LineSegments(shackleEdges, lockEdgeMat);
+  shacklePivot.add(shackleWire);
+
+  lockGroup.add(shacklePivot);
 
   function buildLabelTexture(){
     var c = document.createElement('canvas');
